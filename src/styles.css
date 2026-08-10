@@ -643,6 +643,170 @@ code {
   padding-top: 4px;
 }
 
+/* --- progression rows --- */
+
+.masthead-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.text-area {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  color: var(--ink);
+  padding: 11px 13px;
+  font-size: 17px;
+  line-height: 1.6;
+  letter-spacing: 0.04em;
+  resize: vertical;
+}
+.text-area:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.prog-row {
+  margin-bottom: 22px;
+}
+.prog-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+  padding: 0 2px;
+}
+.prog-symbol {
+  margin: 0;
+  font-size: 20px;
+  letter-spacing: -0.01em;
+}
+.prog-tones {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+.mini-tone {
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 11.5px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  padding: 1px 6px;
+  background: var(--panel);
+}
+.mini-tone em {
+  font-style: normal;
+  opacity: 0.55;
+  margin-left: 4px;
+}
+.prog-count {
+  color: var(--ink-faint);
+  font-size: 12.5px;
+  margin-left: auto;
+}
+
+/*
+ * One horizontally scrolling strip per chord. Negative margins let the strip
+ * bleed to the screen edges on a phone so the last card doesn't look clipped,
+ * and scroll-snap makes flicking between shapes feel deliberate.
+ */
+.strip {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 4px 20px 12px;
+  margin: 0 -20px;
+  scroll-snap-type: x proximity;
+  scrollbar-width: thin;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+}
+.strip::-webkit-scrollbar {
+  height: 8px;
+}
+.strip::-webkit-scrollbar-thumb {
+  background: var(--line);
+  border-radius: 4px;
+}
+.strip-card {
+  flex: 0 0 176px;
+  scroll-snap-align: start;
+}
+.empty.small {
+  font-size: 13px;
+  padding: 10px 13px;
+}
+
+/* --- mobile --- */
+
+@media (max-width: 640px) {
+  body {
+    font-size: 14.5px;
+  }
+  .app {
+    padding: 14px 14px 60px;
+  }
+  .masthead {
+    padding: 8px 0 18px;
+  }
+  .masthead h1 {
+    font-size: 23px;
+  }
+  .masthead p {
+    font-size: 13.5px;
+  }
+  .panel {
+    padding: 14px 14px 16px;
+    margin-bottom: 12px;
+  }
+  .builder-symbol {
+    font-size: 25px;
+  }
+  .opts {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  .grid {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 10px;
+  }
+  .strip {
+    padding: 4px 14px 12px;
+    margin: 0 -14px;
+  }
+  .strip-card {
+    flex: 0 0 158px;
+  }
+  /* Tap targets stay finger-sized even as everything else shrinks. */
+  .chip {
+    padding: 8px 12px;
+  }
+  .seg-btn {
+    padding: 7px 13px;
+  }
+  .play {
+    width: 32px;
+    height: 32px;
+  }
+  /* The rules table is the one genuinely wide element: let it scroll itself
+     rather than forcing the page to scroll sideways. */
+  .rules-panel {
+    overflow-x: auto;
+  }
+  .rules-table {
+    min-width: 460px;
+  }
+  .text-input.big {
+    max-width: 100%;
+  }
+}
+
 .foot {
   margin-top: 40px;
   padding-top: 18px;

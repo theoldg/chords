@@ -183,7 +183,15 @@ function evaluate(
   if (hand.barre) score += 1.4;
   score += Math.max(0, hand.span - 1) * 1.5;
   score -= notes.filter((n) => n.fret === 0).length * 0.6;
-  score -= notes.length * 0.5;
+
+  // Prefer voicings that ring out across the whole instrument: every silent
+  // string is a cost, and using all of them earns an extra bonus on top.
+  const silentStrings = strings.length - notes.length;
+  score += silentStrings * 1.6;
+  if (silentStrings === 0) {
+    score -= 1.5;
+    flags.push({ kind: "info", text: "All strings" });
+  }
   if (innerMutes > 0) {
     score += 4 * innerMutes;
     flags.push({ kind: "warn", text: `Skips ${innerMutes} inner string${innerMutes > 1 ? "s" : ""}` });

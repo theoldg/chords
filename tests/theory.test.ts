@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_BUILDER, buildChord, parseChordSymbol } from "../src/theory/chord";
+import {
+  DEFAULT_BUILDER,
+  buildChord,
+  parseChordSymbol,
+  parseProgression,
+} from "../src/theory/chord";
 import { analyseTones } from "../src/theory/rules";
 import { DEFAULT_SEARCH_OPTIONS, findVoicings } from "../src/theory/search";
 import { parseTuning } from "../src/theory/tuning";
@@ -122,6 +127,26 @@ describe("block builder", () => {
   });
 });
 
+describe("progression parsing", () => {
+  it("splits on spaces, commas, bar lines and newlines", () => {
+    const entries = parseProgression("Am7 D7, Gmaj7 | Cmaj7\nF#m7b5");
+    expect(entries.map((e) => e.text)).toEqual(["Am7", "D7", "Gmaj7", "Cmaj7", "F#m7b5"]);
+    expect(entries.every((e) => e.spec !== null)).toBe(true);
+  });
+
+  it("keeps going past a chord it can't read, and says which one", () => {
+    const entries = parseProgression("Am7 Xyz9 Gmaj7");
+    expect(entries).toHaveLength(3);
+    expect(entries[1].spec).toBeNull();
+    expect(entries[1].error).toBeTruthy();
+    expect(entries[2].spec).toBeTruthy();
+  });
+
+  it("ignores stray separators rather than emitting blank rows", () => {
+    expect(parseProgression("  Am7 |  | - \n\n D7  ").map((e) => e.text)).toEqual(["Am7", "D7"]);
+  });
+});
+
 describe("omission rules", () => {
   const rulesFor = (symbol: string, allowRootOmission = false) =>
     analyseTones(parseChordSymbol(symbol).spec!, { allowRootOmission });
@@ -220,6 +245,23 @@ describe("voicing search", () => {
       expect(labels.has("b3"), v.id).toBe(true);
       expect(labels.has("11"), v.id).toBe(true);
     }
+  });
+
+  it("ranks a full-width voicing above the same shape with a string muted", () => {
+    const res = search("Em", "EADGBE", { maxResults: 500 });
+    const full = res.voicings.find((v) => v.id === "0-2-2-0-0-0");
+    const muted = res.voicings.find((v) => v.id === "x-2-2-0-0-0");
+    expect(full, "full six-string Em").toBeTruthy();
+    expect(muted, "same shape, low E muted").toBeTruthy();
+    expect(full!.score).toBeLessThan(muted!.score);
+  });
+
+  it("puts shapes using every string near the top", () => {
+    const res = search("G", "EADGBE", { maxResults: 12 });
+    const usesAll = res.voicings
+      .slice(0, 4)
+      .some((v) => v.notes.length === 6 && v.flags.some((f) => f.text === "All strings"));
+    expect(usesAll).toBe(true);
   });
 
   it("explains itself when nothing fits", () => {

@@ -441,6 +441,28 @@ function finishSpec(
   };
 }
 
+export interface ProgressionEntry {
+  /** Exactly what the user typed, for echoing back in errors. */
+  text: string;
+  spec: ChordSpec | null;
+  error: string | null;
+}
+
+/**
+ * Split a typed progression into chords. Accepts whitespace, commas, newlines
+ * and bar lines as separators, so pasting "Am7 | D7 | Gmaj7" works as-is.
+ */
+export function parseProgression(input: string): ProgressionEntry[] {
+  return input
+    .split(/[\s,|\n\r]+/)
+    .map((t) => t.trim())
+    .filter((t) => t.length > 0 && t !== "-")
+    .map((text) => {
+      const { spec, error } = parseChordSymbol(text);
+      return { text, spec, error };
+    });
+}
+
 export const ROOT_CHOICES = [
   "C",
   "C#",

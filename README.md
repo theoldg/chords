@@ -20,10 +20,21 @@ browser at http://localhost:5173.
 
 ## What it does
 
-Pick a tuning (presets, or type `DAEGAD`), build a chord out of blocks — root,
-quality, 6th/7th, extensions, alterations — and get ranked, playable fingerings.
-Each one is labelled with what it omits and why: **"omits the 5th · 5th is
-expendable"**.
+Two modes, sharing one tuning and one set of constraints.
+
+**One chord** — pick a tuning (presets, or type `DAEGAD`), build a chord out of
+blocks (root, quality, 6th/7th, extensions, alterations) and get ranked,
+playable fingerings. Each is labelled with what it omits and why: **"omits the
+5th · 5th is expendable"**.
+
+**Progression** — paste or type a list of chord symbols, separated by spaces,
+commas, bar lines or newlines. You get one horizontally scrolling row of
+fingerings per chord, so you can pick a shape for each and see the whole
+sequence at once. An unreadable symbol reports itself in place without stopping
+the rest of the list.
+
+Ranking favours shapes that ring out across every string, then playability
+(span, finger count, barre), then how little the shape drops.
 
 ## Where the rules come from
 
@@ -70,7 +81,7 @@ src/theory/tuning.ts   tuning text -> MIDI notes per string
 src/theory/chord.ts    block builder + text parser -> chord tones with roles
 src/theory/rules.ts    what may be dropped, and why
 src/theory/search.ts   fingering search, hand feasibility, ranking
-src/ui/                builder, chord diagrams, controls
+src/ui/                builder, chord diagrams, progression rows, controls
 src/audio/pluck.ts     Karplus-Strong so you can hear a voicing
 tests/theory.test.ts   golden tests in standard tuning
 ```

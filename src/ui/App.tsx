@@ -12,11 +12,15 @@ import { TUNING_PRESETS, parseTuning } from "../theory/tuning";
 import { strum } from "../audio/pluck";
 import { ChordBuilder } from "./ChordBuilder";
 import { ChordDiagram } from "./ChordDiagram";
+import { ProgressionView } from "./ProgressionView";
 
 type Mode = "blocks" | "text";
+type View = "single" | "progression";
 
 export function App() {
   const [tuningText, setTuningText] = useState("DAEGAD");
+  const [view, setView] = useState<View>("single");
+  const [progressionText, setProgressionText] = useState("Am7 D7 Gmaj7 Cmaj7");
   const [mode, setMode] = useState<Mode>("blocks");
   const [builder, setBuilder] = useState<ChordBuilderState>(DEFAULT_BUILDER);
   const [chordText, setChordText] = useState("Gm(add11)");
@@ -32,9 +36,9 @@ export function App() {
   const chordError = mode === "text" ? parsed.error : null;
 
   const result = useMemo(() => {
-    if (!spec || !tuning) return null;
+    if (view !== "single" || !spec || !tuning) return null;
     return findVoicings(spec, tuning, opts);
-  }, [spec, tuning, opts]);
+  }, [view, spec, tuning, opts]);
 
   const setOpt = <K extends keyof SearchOptions>(key: K, value: SearchOptions[K]) =>
     setOpts((o) => ({ ...o, [key]: value }));
@@ -42,7 +46,25 @@ export function App() {
   return (
     <div className="app">
       <header className="masthead">
-        <h1>Chord Shapes</h1>
+        <div className="masthead-top">
+          <h1>Chord Shapes</h1>
+          <div className="seg">
+            <button
+              type="button"
+              className={`seg-btn ${view === "single" ? "on" : ""}`}
+              onClick={() => setView("single")}
+            >
+              One chord
+            </button>
+            <button
+              type="button"
+              className={`seg-btn ${view === "progression" ? "on" : ""}`}
+              onClick={() => setView("progression")}
+            >
+              Progression
+            </button>
+          </div>
+        </div>
         <p>
           Fingerings for any chord in any tuning — and an honest account of which notes each shape
           leaves out.
@@ -50,7 +72,7 @@ export function App() {
       </header>
 
       <section className="panel">
-        <h2>1. Tuning</h2>
+        <h2>Tuning</h2>
         <div className="chip-row presets">
           {TUNING_PRESETS.map((p) => (
             <button
@@ -94,9 +116,10 @@ export function App() {
         )}
       </section>
 
+      {view === "single" && (
       <section className="panel">
         <div className="panel-head">
-          <h2>2. Chord</h2>
+          <h2>Chord</h2>
           <div className="seg">
             <button
               type="button"
@@ -157,9 +180,10 @@ export function App() {
           </p>
         ))}
       </section>
+      )}
 
       <section className="panel">
-        <h2>3. Constraints</h2>
+        <h2>Constraints</h2>
         <div className="opts">
           <label className="opt">
             <span>
@@ -232,6 +256,16 @@ export function App() {
           </label>
         </div>
       </section>
+
+      {view === "progression" && (
+        <ProgressionView
+          text={progressionText}
+          onTextChange={setProgressionText}
+          tuning={tuning}
+          opts={opts}
+          showDegrees={showDegrees}
+        />
+      )}
 
       {result && spec && (
         <>
