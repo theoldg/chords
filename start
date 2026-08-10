@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+# Launch the chord app. Installs dependencies on first run, then serves it and
+# opens a browser.
+#
+#   ./start           dev server with hot reload (default)
+#   ./start host      dev server reachable from other devices on your network
+#   ./start build     produce a static site in dist/
+#   ./start preview   build, then serve the built site locally
+#
+set -euo pipefail
+cd "$(dirname "$0")"
+
+MODE="${1:-dev}"
+
+if ! command -v node >/dev/null 2>&1; then
+  echo "Node.js isn't installed. Get it from https://nodejs.org (or: brew install node)." >&2
+  exit 1
+fi
+
+if [ ! -d node_modules ]; then
+  echo "==> First run: installing dependencies…"
+  npm install
+fi
+
+case "$MODE" in
+  dev)
+    echo "==> Starting on http://localhost:5173 (Ctrl-C to stop)"
+    exec npx vite --open
+    ;;
+  host)
+    echo "==> Starting on your local network — look for the Network: URL below."
+    exec npx vite --host --open
+    ;;
+  build)
+    npx vite build
+    echo "==> Built to ./dist — upload that folder to any static host."
+    ;;
+  preview)
+    npx vite build
+    exec npx vite preview --open
+    ;;
+  *)
+    echo "Unknown mode: $MODE" >&2
+    echo "Usage: ./start [dev|host|build|preview]" >&2
+    exit 1
+    ;;
+esac
