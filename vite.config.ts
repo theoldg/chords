@@ -2,14 +2,16 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
 /**
- * GitHub Pages serves a project repo from a subpath
- * (https://<user>.github.io/chords/), so the build needs a matching `base` or
- * every asset URL 404s. Dev stays at "/" so `./start` is unaffected.
+ * Relative base ("./assets/…" rather than "/chords/assets/…").
  *
- * Override with BASE_PATH=/whatever/ if the repo is ever renamed, or set
- * BASE_PATH=/ when deploying to a user site or a custom domain.
+ * The app is a single static page with no client-side router, so relative URLs
+ * work no matter where it's mounted: a GitHub Pages project site under
+ * /chords/, a user site or custom domain at the root, `vite preview`, or even
+ * opening dist/index.html straight off disk. An absolute base has to match the
+ * deploy path exactly and silently 404s every asset when it doesn't — which is
+ * a blank page with no useful error.
  */
-export default defineConfig(({ command }) => ({
-  base: command === "build" ? (process.env.BASE_PATH ?? "/chords/") : "/",
+export default defineConfig({
+  base: "./",
   plugins: [react()],
-}));
+});

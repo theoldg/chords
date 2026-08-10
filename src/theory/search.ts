@@ -184,6 +184,12 @@ function evaluate(
   score += Math.max(0, hand.span - 1) * 1.5;
   score -= notes.filter((n) => n.fret === 0).length * 0.6;
 
+  // Prefer shapes near the nut. Cheap to reach, easier to hold, and they get
+  // to use open strings. Scaled so a shape twelve frets up pays about four
+  // points — enough to lose to its open-position equivalent, not so much that
+  // it outweighs dropping a required-ish tone.
+  score += hand.lowestFret * 0.35;
+
   // Prefer voicings that ring out across the whole instrument: every silent
   // string is a cost, and using all of them earns an extra bonus on top.
   const silentStrings = strings.length - notes.length;

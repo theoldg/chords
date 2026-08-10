@@ -264,6 +264,20 @@ describe("voicing search", () => {
     expect(usesAll).toBe(true);
   });
 
+  it("prefers a shape near the nut to the same shape an octave up", () => {
+    const res = search("Am", "EADGBE", { maxFret: 16, maxResults: 2000 });
+    const open = res.voicings.find((v) => v.id === "x-0-2-2-1-0");
+    const high = res.voicings.find((v) => v.id === "x-12-14-14-13-12");
+    expect(open, "open A minor").toBeTruthy();
+    expect(high, "same shape at the 12th").toBeTruthy();
+    expect(open!.score).toBeLessThan(high!.score);
+  });
+
+  it("ranks the lowest position first for a chord playable open", () => {
+    const best = search("Am", "EADGBE", { maxFret: 16 }).voicings[0];
+    expect(best.lowestFret).toBeLessThanOrEqual(2);
+  });
+
   it("explains itself when nothing fits", () => {
     // Open strings only: EADGBE has no Bb, so the required b7 of C13 is
     // unreachable and there is genuinely nothing to find.

@@ -3,3 +3,6 @@ dist/
 .DS_Store
 *.local
 .vite/
+
+# Downloaded deploy artifacts kept for debugging, not part of the build.
+gh-pages-debug/
