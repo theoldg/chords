@@ -81,6 +81,21 @@ code {
   max-width: 1180px;
   margin: 0 auto;
   padding: 28px 20px 80px;
+  /* Clear the notch and home indicator when installed and running standalone. */
+  padding-left: max(20px, env(safe-area-inset-left));
+  padding-right: max(20px, env(safe-area-inset-right));
+  padding-bottom: max(80px, calc(env(safe-area-inset-bottom) + 40px));
+}
+
+/*
+ * Installed, the app is a window rather than a page: kill the elastic
+ * overscroll that makes a standalone PWA feel like a website in a costume.
+ */
+@media (display-mode: standalone) {
+  html,
+  body {
+    overscroll-behavior-y: none;
+  }
 }
 
 .masthead {
@@ -751,6 +766,9 @@ code {
   }
   .app {
     padding: 14px 14px 60px;
+    padding-left: max(14px, env(safe-area-inset-left));
+    padding-right: max(14px, env(safe-area-inset-right));
+    padding-bottom: max(60px, calc(env(safe-area-inset-bottom) + 30px));
   }
   .masthead {
     padding: 8px 0 18px;

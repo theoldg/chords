@@ -17,6 +17,22 @@ browser at http://localhost:5173.
 | `./start build` | static site in `dist/` — drop it on any host |
 | `./start preview` | build, then serve the built site |
 | `npm test` | run the theory test suite |
+| `npm run icons` | regenerate the PWA icons from `scripts/make-icons.mjs` |
+
+## Installing it on a phone
+
+It's a PWA, so it installs from the browser with no app store involved. Open the
+deployed site in Chrome on Android and use **⋮ → Add to Home screen** (Chrome
+usually offers an install prompt on its own); on iOS use Safari's **Share → Add
+to Home Screen**. It then launches without browser chrome, and a service worker
+caches the app so it keeps working with no signal — which is the point, since
+you practise where the wifi isn't.
+
+Icons are generated, not hand-drawn: `scripts/make-icons.mjs` rasterises the
+chord-diagram mark straight to PNG using only Node's zlib, so there's no image
+dependency and the favicon and app icons can't drift apart. It emits the 192
+and 512 sizes Chrome needs, a maskable variant with the art inside Android's
+safe zone, and an apple-touch-icon.
 
 ## What it does
 
