@@ -323,7 +323,6 @@ export function App() {
                         </span>
                       );
                     })}
-                    {v.omitted.length === 0 && <span className="badge complete">all tones</span>}
                     {v.flags.map((f) => (
                       <span className={`badge ${f.kind}`} key={f.text}>
                         {f.text}

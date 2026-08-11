@@ -646,11 +646,6 @@ code {
   border-color: transparent;
   font-weight: 550;
 }
-.badge.complete {
-  background: var(--ok-soft);
-  color: var(--ok);
-  border-color: transparent;
-}
 .badge.warn {
   background: var(--accent-soft);
   color: var(--accent);

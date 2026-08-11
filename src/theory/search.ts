@@ -231,6 +231,24 @@ function evaluate(
       score += pastBarre * 2.5;
       flags.push({ kind: "warn", text: "Must mute past the barre" });
     }
+
+    /*
+     * The same overhang makes a barre that stops short of the treble side
+     * outright unplayable when the strings past it have to ring open, or be
+     * fretted below the barre: the finger is already lying on them. Fmaj7 as
+     * 1-3-2-2-1-0 reads fine on paper — index barre at the 1st fret, high E
+     * open — but the barre is pressing that high E at the 1st fret whether
+     * you like it or not. Priced high enough that any honest alternative wins.
+     */
+    let deadened = 0;
+    for (let i = hand.barre.to + 1; i < frets.length; i++) {
+      const f = frets[i];
+      if (f !== null && f < hand.barre.fret) deadened++;
+    }
+    if (deadened > 0) {
+      score += deadened * 8;
+      flags.push({ kind: "warn", text: "Barre lies over the open high strings" });
+    }
   }
   if (innerMutes > 0) {
     score += 3 * innerMutes;

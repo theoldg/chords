@@ -207,6 +207,17 @@ describe("voicing search", () => {
     expect(shapes).toContain("1-3-3-2-1-1");
   });
 
+  it("does not rank a barre that lies over an open string it needs", () => {
+    // 1-3-2-2-1-0 asks for an index barre at the 1st fret and an open high E
+    // the barre is already pressing. The full-barre Fmaj7 must beat it.
+    const res = search("Fmaj7", "EADGBE");
+    const full = res.voicings.find((v) => v.id === "1-3-2-2-1-1");
+    const impossible = res.voicings.find((v) => v.id === "1-3-2-2-1-0");
+    expect(full, "full Fmaj7 barre").toBeTruthy();
+    expect(res.voicings[0].id).toBe("1-3-2-2-1-1");
+    if (impossible) expect(impossible.score).toBeGreaterThan(full!.score + 6);
+  });
+
   it("finds the Hendrix E7#9 and reports that it drops the 5th", () => {
     // Ranked low on purpose — it lives at the 7th fret and we prefer low
     // positions — so search the whole space. What matters here is that the

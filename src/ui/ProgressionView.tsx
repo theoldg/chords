@@ -87,7 +87,6 @@ export function ProgressionView({ text, tuning, opts, showDegrees }: Props) {
                         </span>
                       );
                     })}
-                    {v.omitted.length === 0 && <span className="badge complete">all tones</span>}
                     {v.flags
                       .filter((f) => f.kind === "warn")
                       .map((f) => (
