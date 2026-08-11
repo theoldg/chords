@@ -156,11 +156,11 @@ export interface ChordBuilderState {
 }
 
 export const DEFAULT_BUILDER: ChordBuilderState = {
-  root: "G",
+  root: "A",
   triad: "min",
   seventh: "none",
   ext9: "off",
-  ext11: "add",
+  ext11: "off",
   ext13: "off",
   alterations: [],
   bass: null,

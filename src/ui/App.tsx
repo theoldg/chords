@@ -14,16 +14,15 @@ import { ChordBuilder } from "./ChordBuilder";
 import { ChordDiagram } from "./ChordDiagram";
 import { ProgressionView } from "./ProgressionView";
 
-type Mode = "blocks" | "text";
-type View = "single" | "progression";
+/** The three ways of naming what you want: build it, type it, type several. */
+type Mode = "blocks" | "text" | "progression";
 
 export function App() {
-  const [tuningText, setTuningText] = useState("DAEGAD");
-  const [view, setView] = useState<View>("single");
+  const [tuningText, setTuningText] = useState("EADGBE");
   const [progressionText, setProgressionText] = useState("Am7 D7 Gmaj7 Cmaj7");
   const [mode, setMode] = useState<Mode>("blocks");
   const [builder, setBuilder] = useState<ChordBuilderState>(DEFAULT_BUILDER);
-  const [chordText, setChordText] = useState("Gm(add11)");
+  const [chordText, setChordText] = useState("Am");
   const [opts, setOpts] = useState<SearchOptions>(DEFAULT_SEARCH_OPTIONS);
   const [showDegrees, setShowDegrees] = useState(true);
 
@@ -32,13 +31,13 @@ export function App() {
   const builtSpec = useMemo(() => buildChord(builder), [builder]);
   const parsed = useMemo(() => parseChordSymbol(chordText), [chordText]);
 
-  const spec: ChordSpec | null = mode === "blocks" ? builtSpec : parsed.spec;
+  const spec: ChordSpec | null = mode === "blocks" ? builtSpec : mode === "text" ? parsed.spec : null;
   const chordError = mode === "text" ? parsed.error : null;
 
   const result = useMemo(() => {
-    if (view !== "single" || !spec || !tuning) return null;
+    if (!spec || !tuning) return null;
     return findVoicings(spec, tuning, opts);
-  }, [view, spec, tuning, opts]);
+  }, [spec, tuning, opts]);
 
   const setOpt = <K extends keyof SearchOptions>(key: K, value: SearchOptions[K]) =>
     setOpts((o) => ({ ...o, [key]: value }));
@@ -46,33 +45,21 @@ export function App() {
   return (
     <div className="app">
       <header className="masthead">
-        <div className="masthead-top">
-          <h1>Chord Shapes</h1>
-          <div className="seg">
-            <button
-              type="button"
-              className={`seg-btn ${view === "single" ? "on" : ""}`}
-              onClick={() => setView("single")}
-            >
-              One chord
-            </button>
-            <button
-              type="button"
-              className={`seg-btn ${view === "progression" ? "on" : ""}`}
-              onClick={() => setView("progression")}
-            >
-              Progression
-            </button>
-          </div>
-        </div>
-        <p>
-          Fingerings for any chord in any tuning — and an honest account of which notes each shape
-          leaves out.
-        </p>
+        <h1>Chord Shapes</h1>
+        <p>Fingerings for any chord in any tuning.</p>
       </header>
 
-      <section className="panel">
-        <h2>Tuning</h2>
+      {/* Tuning and constraints are set once and then mostly left alone, so they
+          fold away behind a single summary line instead of two standing panels. */}
+      <details className="panel settings">
+        <summary className="settings-summary">
+          <span className="settings-title">Settings</span>
+          <span className="settings-digest mono">
+            {tuningText.toUpperCase()} · span {opts.maxSpan} · to fret {opts.maxFret}
+          </span>
+        </summary>
+
+        <h3 className="settings-head">Tuning</h3>
         <div className="chip-row presets">
           {TUNING_PRESETS.map((p) => (
             <button
@@ -114,76 +101,8 @@ export function App() {
             ascending from the lowest string.
           </p>
         )}
-      </section>
 
-      {view === "single" && (
-      <section className="panel">
-        <div className="panel-head">
-          <h2>Chord</h2>
-          <div className="seg">
-            <button
-              type="button"
-              className={`seg-btn ${mode === "blocks" ? "on" : ""}`}
-              onClick={() => setMode("blocks")}
-            >
-              Blocks
-            </button>
-            <button
-              type="button"
-              className={`seg-btn ${mode === "text" ? "on" : ""}`}
-              onClick={() => setMode("text")}
-            >
-              Type it
-            </button>
-          </div>
-        </div>
-
-        {mode === "blocks" ? (
-          <ChordBuilder state={builder} onChange={setBuilder} symbol={builtSpec.symbol} />
-        ) : (
-          <div className="text-mode">
-            <input
-              className={`text-input big mono ${chordError ? "bad" : ""}`}
-              value={chordText}
-              onChange={(e) => setChordText(e.target.value)}
-              spellCheck={false}
-              aria-label="Chord symbol"
-            />
-            {chordError ? (
-              <p className="error">{chordError}</p>
-            ) : (
-              <p className="hint">
-                Understands <code>Gm(add11)</code>, <code>Cmaj7#11</code>, <code>E7#9</code>,{" "}
-                <code>C6/9</code>, <code>F7alt</code>, <code>Am7/E</code>, <code>Cno5</code>.
-              </p>
-            )}
-          </div>
-        )}
-
-        {spec && (
-          <div className="spec-readout">
-            <span className="spec-symbol">{spec.symbol}</span>
-            <span className="spec-notes">
-              {spec.tones.map((t) => (
-                <span key={t.degree} className={`tone-pill role-${t.role}`}>
-                  <b>{t.noteName}</b>
-                  <span>{t.label}</span>
-                </span>
-              ))}
-            </span>
-          </div>
-        )}
-
-        {spec?.warnings.map((w) => (
-          <p className="warning" key={w}>
-            {w}
-          </p>
-        ))}
-      </section>
-      )}
-
-      <section className="panel">
-        <h2>Constraints</h2>
+        <h3 className="settings-head">Constraints</h3>
         <div className="opts">
           <label className="opt">
             <span>
@@ -255,12 +174,102 @@ export function App() {
             </span>
           </label>
         </div>
+      </details>
+
+      <section className="panel">
+        <div className="panel-head">
+          <h2>{mode === "progression" ? "Chords" : "Chord"}</h2>
+          <div className="seg">
+            <button
+              type="button"
+              className={`seg-btn ${mode === "blocks" ? "on" : ""}`}
+              onClick={() => setMode("blocks")}
+            >
+              Build
+            </button>
+            <button
+              type="button"
+              className={`seg-btn ${mode === "text" ? "on" : ""}`}
+              onClick={() => setMode("text")}
+            >
+              Type
+            </button>
+            <button
+              type="button"
+              className={`seg-btn ${mode === "progression" ? "on" : ""}`}
+              onClick={() => setMode("progression")}
+            >
+              Multiple
+            </button>
+          </div>
+        </div>
+
+        {mode === "blocks" && (
+          <ChordBuilder state={builder} onChange={setBuilder} symbol={builtSpec.symbol} />
+        )}
+
+        {mode === "text" && (
+          <div className="text-mode">
+            <input
+              className={`text-input big mono ${chordError ? "bad" : ""}`}
+              value={chordText}
+              onChange={(e) => setChordText(e.target.value)}
+              spellCheck={false}
+              aria-label="Chord symbol"
+            />
+            {chordError ? (
+              <p className="error">{chordError}</p>
+            ) : (
+              <p className="hint">
+                Understands <code>Gm(add11)</code>, <code>Cmaj7#11</code>, <code>E7#9</code>,{" "}
+                <code>C6/9</code>, <code>F7alt</code>, <code>Am7/E</code>, <code>Cno5</code>.
+              </p>
+            )}
+          </div>
+        )}
+
+        {mode === "progression" && (
+          <>
+            <textarea
+              className="text-area mono"
+              value={progressionText}
+              onChange={(e) => setProgressionText(e.target.value)}
+              rows={2}
+              spellCheck={false}
+              placeholder="Am7  D7  Gmaj7  Cmaj7"
+              aria-label="Chord progression"
+            />
+            <p className="hint">
+              One row of fingerings per chord. Separate with spaces, commas, bar lines or new lines —
+              paste a chart straight in. Each row scrolls sideways.
+            </p>
+          </>
+        )}
+
+        {spec && (
+          <div className="spec-readout">
+            <span className="spec-symbol">{spec.symbol}</span>
+            <span className="spec-notes">
+              {spec.tones.map((t) => (
+                <span key={t.degree} className={`tone-pill role-${t.role}`}>
+                  <b>{t.noteName}</b>
+                  <span>{t.label}</span>
+                </span>
+              ))}
+            </span>
+          </div>
+        )}
+
+        {spec?.warnings.map((w) => (
+          <p className="warning" key={w}>
+            {w}
+          </p>
+        ))}
       </section>
 
-      {view === "progression" && (
+      {mode === "progression" && (
         <ProgressionView
           text={progressionText}
-          onTextChange={setProgressionText}
           tuning={tuning}
           opts={opts}
           showDegrees={showDegrees}
@@ -269,34 +278,6 @@ export function App() {
 
       {result && spec && (
         <>
-          <section className="panel rules-panel">
-            <h2>Which notes may be dropped</h2>
-            <table className="rules-table">
-              <thead>
-                <tr>
-                  <th>Tone</th>
-                  <th>Note</th>
-                  <th>Status</th>
-                  <th>Why</th>
-                </tr>
-              </thead>
-              <tbody>
-                {result.rules.map((r) => (
-                  <tr key={r.tone.degree} className={r.required ? "req" : "opt-row"}>
-                    <td className={`role-cell role-${r.tone.role}`}>{r.tone.label}</td>
-                    <td className="mono">{r.tone.noteName}</td>
-                    <td>
-                      <span className={`status ${r.required ? "required" : "optional"}`}>
-                        {r.required ? "required" : "may drop"}
-                      </span>
-                    </td>
-                    <td className="why">{r.explanation}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </section>
-
           <section className="results">
             <div className="results-head">
               <h2>

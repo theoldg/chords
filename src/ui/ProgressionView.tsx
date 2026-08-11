@@ -8,7 +8,6 @@ import { ChordDiagram } from "./ChordDiagram";
 
 interface Props {
   text: string;
-  onTextChange: (next: string) => void;
   tuning: Tuning | null;
   opts: SearchOptions;
   showDegrees: boolean;
@@ -17,7 +16,7 @@ interface Props {
 /** Voicings shown per row before the strip gets silly. */
 const PER_ROW = 14;
 
-export function ProgressionView({ text, onTextChange, tuning, opts, showDegrees }: Props) {
+export function ProgressionView({ text, tuning, opts, showDegrees }: Props) {
   const entries = useMemo(() => parseProgression(text), [text]);
 
   const rows = useMemo(() => {
@@ -32,23 +31,6 @@ export function ProgressionView({ text, onTextChange, tuning, opts, showDegrees 
 
   return (
     <div className="progression">
-      <section className="panel">
-        <h2>Progression</h2>
-        <textarea
-          className="text-area mono"
-          value={text}
-          onChange={(e) => onTextChange(e.target.value)}
-          rows={2}
-          spellCheck={false}
-          placeholder="Am7  D7  Gmaj7  Cmaj7"
-          aria-label="Chord progression"
-        />
-        <p className="hint">
-          One row of fingerings per chord. Separate with spaces, commas, bar lines or new lines —
-          paste a chart straight in. Each row scrolls sideways.
-        </p>
-      </section>
-
       {rows.map(({ entry, result }, i) => (
         <section className="prog-row" key={`${entry.text}-${i}`}>
           <div className="prog-head">

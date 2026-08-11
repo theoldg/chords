@@ -130,6 +130,60 @@ code {
   font-weight: 600;
 }
 
+/* Collapsed, the settings panel is one row: a label and a digest of what is
+   currently set, so you can check the tuning without opening anything. */
+.settings[open] {
+  padding-bottom: 20px;
+}
+.settings:not([open]) {
+  padding: 12px 20px;
+}
+.settings-summary {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+  cursor: pointer;
+  list-style: none;
+}
+.settings-summary::-webkit-details-marker {
+  display: none;
+}
+.settings-summary::before {
+  content: "›";
+  color: var(--ink-faint);
+  transform: rotate(0deg);
+  transition: transform 0.15s;
+  font-size: 15px;
+  line-height: 1;
+}
+.settings[open] .settings-summary::before {
+  transform: rotate(90deg);
+}
+.settings-title {
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--ink-faint);
+  font-weight: 600;
+}
+.settings-digest {
+  font-size: 12.5px;
+  color: var(--ink-faint);
+  margin-left: auto;
+}
+.settings[open] .settings-digest {
+  display: none;
+}
+.settings-head {
+  margin: 18px 0 10px;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--ink-faint);
+  font-weight: 600;
+}
+
 .panel-head {
   display: flex;
   align-items: center;
@@ -427,52 +481,6 @@ code {
   font-size: 12px;
 }
 
-/* --- rules table --- */
-
-.rules-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 13.5px;
-}
-.rules-table th {
-  text-align: left;
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.07em;
-  color: var(--ink-faint);
-  padding: 0 10px 7px 0;
-  font-weight: 600;
-}
-.rules-table td {
-  padding: 7px 10px 7px 0;
-  border-top: 1px solid var(--line);
-  vertical-align: top;
-}
-.role-cell {
-  font-family: ui-monospace, Menlo, monospace;
-  font-weight: 700;
-  white-space: nowrap;
-}
-.status {
-  display: inline-block;
-  font-size: 11.5px;
-  border-radius: 20px;
-  padding: 1.5px 9px;
-  white-space: nowrap;
-  font-weight: 550;
-}
-.status.required {
-  background: var(--ok-soft);
-  color: var(--ok);
-}
-.status.optional {
-  background: var(--warn-soft);
-  color: var(--warn);
-}
-.why {
-  color: var(--ink-soft);
-}
-
 /* --- results --- */
 
 .results-head {
@@ -660,14 +668,6 @@ code {
 
 /* --- progression rows --- */
 
-.masthead-top {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 14px;
-  flex-wrap: wrap;
-}
-
 .text-area {
   width: 100%;
   background: var(--bg);
@@ -811,14 +811,6 @@ code {
   .play {
     width: 32px;
     height: 32px;
-  }
-  /* The rules table is the one genuinely wide element: let it scroll itself
-     rather than forcing the page to scroll sideways. */
-  .rules-panel {
-    overflow-x: auto;
-  }
-  .rules-table {
-    min-width: 460px;
   }
   .text-input.big {
     max-width: 100%;
