@@ -10,6 +10,13 @@ export interface SearchOptions extends RuleOptions {
   minSoundingStrings: number;
   /** Allow a muted string sandwiched between sounding ones. */
   allowInnerMutes: boolean;
+  /**
+   * Collapse shapes that share their fretted notes and differ only in which
+   * strings ring open and which stay silent, keeping the best-scoring one.
+   * Off lets a caller inspect both members of such a pair — which is how the
+   * mute-pricing model is tested.
+   */
+  collapseMuteVariants: boolean;
   maxResults: number;
 }
 
@@ -18,6 +25,7 @@ export const DEFAULT_SEARCH_OPTIONS: SearchOptions = {
   maxSpan: 4,
   minSoundingStrings: 4,
   allowInnerMutes: false,
+  collapseMuteVariants: true,
   allowRootOmission: false,
   maxResults: 36,
 };
@@ -110,7 +118,30 @@ export function findVoicings(
   walk(0, Infinity, -Infinity);
 
   results.sort((a, b) => a.score - b.score);
-  const trimmed = results.slice(0, opts.maxResults);
+
+  /*
+   * Shapes that share their fretted notes and differ only in which of the
+   * remaining strings ring open and which stay silent are one grip, not
+   * several: the left hand does nothing different, and the list was showing
+   * Am7 as x-0-2-0-1-0, then 0-0-2-0-1-0, then x-0-2-0-1-x — the same chord
+   * three times, crowding out genuinely different voicings.
+   *
+   * Keep the best-scoring member of each grip. Everything that distinguishes
+   * them — the open-string bonus, where the mute sits, the bass note, whether
+   * the shape rings across the whole instrument — is already priced, so the
+   * survivor of a sorted list is the one actually worth playing.
+   */
+  const seen = new Set<string>();
+  const deduped = !opts.collapseMuteVariants
+    ? results
+    : results.filter((v) => {
+        const grip = v.frets.map((f, i) => (f !== null && f > 0 ? `${i}:${f}` : "")).join(",");
+        if (seen.has(grip)) return false;
+        seen.add(grip);
+        return true;
+      });
+
+  const trimmed = deduped.slice(0, opts.maxResults);
 
   return {
     voicings: trimmed,

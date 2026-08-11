@@ -152,6 +152,9 @@ describe("muting is priced by how hard it is", () => {
     findVoicings(parseChordSymbol(symbol).spec!, tuning(), {
       ...DEFAULT_SEARCH_OPTIONS,
       maxResults: 5000,
+      // These comparisons are between two shapes that differ only by a mute,
+      // which is exactly the pair the search collapses for display.
+      collapseMuteVariants: false,
     }).voicings.find((v) => v.id === id);
 
   it("prefers muting the low side to muting the high side", () => {

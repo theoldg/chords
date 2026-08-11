@@ -221,8 +221,14 @@ describe("voicing search", () => {
   it("finds the Hendrix E7#9 and reports that it drops the 5th", () => {
     // Ranked low on purpose — it lives at the 7th fret and we prefer low
     // positions — so search the whole space. What matters here is that the
-    // engine finds it at all and reports the omission correctly.
-    const res = search("E7#9", "EADGBE", { minSoundingStrings: 4, maxResults: 100000 });
+    // engine finds it at all and reports the omission correctly. Mute variants
+    // stay expanded because display prefers the same grip with the low E left
+    // ringing, and this test is about the classic muted-low form.
+    const res = search("E7#9", "EADGBE", {
+      minSoundingStrings: 4,
+      maxResults: 100000,
+      collapseMuteVariants: false,
+    });
     const hendrix = res.voicings.find((v) => v.id === "x-7-6-7-8-x");
     expect(hendrix).toBeTruthy();
     expect(hendrix!.omitted.map((o) => o.label)).toEqual(["5"]);
@@ -262,7 +268,8 @@ describe("voicing search", () => {
   });
 
   it("ranks a full-width voicing above the same shape with a string muted", () => {
-    const res = search("Em", "EADGBE", { maxResults: 500 });
+    // Both members of the pair, since display keeps only the winner.
+    const res = search("Em", "EADGBE", { maxResults: 500, collapseMuteVariants: false });
     const full = res.voicings.find((v) => v.id === "0-2-2-0-0-0");
     const muted = res.voicings.find((v) => v.id === "x-2-2-0-0-0");
     expect(full, "full six-string Em").toBeTruthy();
