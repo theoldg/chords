@@ -288,6 +288,9 @@ code {
     transition-duration: 1ms;
     transition-delay: 0s;
   }
+  .card {
+    animation-duration: 1ms;
+  }
 }
 .settings-summary {
   display: flex;
@@ -770,6 +773,16 @@ code {
   flex-direction: column;
   /* So the fret row can size itself against the card it sits in. */
   container-type: inline-size;
+  /* A card is keyed by its fret pattern (see search.ts), so this only plays
+     for shapes that are actually new — a settings tweak that resurfaces the
+     same shape keeps its DOM node and skips the animation entirely. */
+  animation: card-in 220ms cubic-bezier(0.2, 0.75, 0.25, 1) both;
+}
+@keyframes card-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.98);
+  }
 }
 
 /*
@@ -1113,9 +1126,10 @@ code {
   gap: 12px;
   overflow-x: auto;
   overflow-y: hidden;
-  padding: 4px 20px 12px;
+  padding: 4px 20px 12px 28px;
   margin: 0 -20px;
   scroll-snap-type: x proximity;
+  scroll-padding-left: 28px;
   scrollbar-width: thin;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior-x: contain;
@@ -1173,8 +1187,9 @@ code {
     gap: 10px;
   }
   .strip {
-    padding: 4px 14px 12px;
+    padding: 4px 14px 12px 22px;
     margin: 0 -14px;
+    scroll-padding-left: 22px;
   }
   .strip-card {
     flex: 0 0 158px;

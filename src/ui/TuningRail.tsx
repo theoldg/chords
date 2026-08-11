@@ -62,13 +62,14 @@ export function TuningRail({ value, onChange, open, onEdit }: Props) {
    * the page included, so a restored 7-string tuning would scroll you past the
    * masthead on load.
    */
-  function centre() {
+  function centre(behavior: ScrollBehavior = "auto") {
     const el = active.current;
     const box = rail.current;
     if (!el || !box) return;
     const centred = el.offsetLeft - (box.clientWidth - el.offsetWidth) / 2;
-    box.scrollLeft = Math.max(0, centred);
-    scrolled.current = box.scrollLeft;
+    const target = Math.max(0, centred);
+    box.scrollTo({ left: target, behavior });
+    scrolled.current = target;
   }
 
   useLayoutEffect(() => {
@@ -78,9 +79,13 @@ export function TuningRail({ value, onChange, open, onEdit }: Props) {
 
     const toggled = wasOpen.current !== open;
     wasOpen.current = open;
+    const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-    if (!toggled || matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      if (!open) centre();
+    if (!toggled || reduced) {
+      // A tuning picked from the already-collapsed rail scrolls it over, rather
+      // than snapping — the fold-toggle case below stays instant, since it is
+      // part of the FLIP measurement the chips animate against.
+      if (!open) centre(reduced ? "auto" : "smooth");
       return;
     }
 

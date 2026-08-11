@@ -359,6 +359,10 @@ export function parseChordSymbol(input: string): { spec: ChordSpec | null; error
   });
   text = text.replace(/[()]/g, "").replace(/,/g, "").trim();
 
+  // "mmaj7" / "minmaj7" / "min/maj7" / "mMAJ7" etc all mean minor/major
+  // seventh, but tonal only recognises the exact casing "mMaj7".
+  text = text.replace(/m(in)?\/?maj/gi, "mMaj");
+
   const rootMatch = /^([A-G][b#]?)/.exec(text);
   if (!rootMatch) {
     return { spec: null, error: "Start with a root note, A-G (use lowercase b for flats)." };
