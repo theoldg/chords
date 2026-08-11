@@ -1,5 +1,7 @@
 # Chord Shapes
 
+> Disclaimer: This is 100% vibe-coded to test the capacities of Claude and for fun.
+
 Find guitar fingerings for any chord in any tuning — and get an honest account
 of which chord tones each shape leaves out.
 
