@@ -299,6 +299,47 @@ describe("voicing search", () => {
     expect(best.lowestFret).toBeLessThanOrEqual(2);
   });
 
+  /*
+   * A slash bass outside the chord — Am/G#, Dm/B, C/F# — is ordinary line-cliché
+   * and pedal-point writing, but its pitch class is in no chord tone, so the
+   * search has to admit it as a candidate fret of its own and then confine it to
+   * the bottom. Before this it couldn't be fretted at all, and the search
+   * quietly returned wrong-bass shapes at a flat penalty instead.
+   */
+  it("frets a slash bass from outside the chord, on the bottom only", () => {
+    const spec = parseChordSymbol("Am/G#").spec!;
+    expect(spec.addedBass!.noteName).toBe("G#");
+    expect(spec.addedBass!.role).toBe("bass");
+    expect(spec.warnings.join(" ")).toMatch(/isn't a tone of Am/);
+
+    const res = search("Am/G#", "EADGBE");
+    expect(res.voicings.length).toBeGreaterThan(0);
+    // Every shape starts on G#, and none doubles it above the bass.
+    for (const v of res.voicings) {
+      expect(v.notes[0].tone.role, v.id).toBe("bass");
+      expect(v.notes.filter((n) => n.tone.role === "bass"), v.id).toHaveLength(1);
+    }
+    // The line-cliché grip: G# on the low E under an open Am.
+    expect(res.voicings.map((v) => v.id)).toContain("4-0-2-2-1-0");
+  });
+
+  it("keeps the added bass out of the required-tone bookkeeping", () => {
+    // The bass G# of Am7/G# is a natural 7 by degree, the same degree as the
+    // chord's own b7 — it must not stand in for a G nobody is playing.
+    const res = search("Am7/G#", "EADGBE");
+    for (const v of res.voicings) {
+      const harmony = v.notes.filter((n) => n.tone.role !== "bass");
+      expect(harmony.map((n) => n.tone.label), v.id).toContain("b7");
+    }
+  });
+
+  it("says so when a slash bass that is a chord tone can't be reached", () => {
+    const res = search("C/G", "EADGBE");
+    const wrongBass = res.voicings.find((v) => v.id === "x-x-2-0-1-0");
+    expect(wrongBass, "open C without the low G").toBeTruthy();
+    expect(wrongBass!.flags.map((f) => f.text).join(" ")).toMatch(/not the lowest note/);
+  });
+
   it("explains itself when nothing fits", () => {
     // Open strings only: EADGBE has no Bb, so the required b7 of C13 is
     // unreachable and there is genuinely nothing to find.

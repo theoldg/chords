@@ -206,7 +206,7 @@ export function App() {
               One row of fingerings per chord. Separate with spaces, commas, bar lines or new lines —
               paste a chart straight in. Each row scrolls sideways. Understands{" "}
               <code>Gm(add11)</code>, <code>Cmaj7#11</code>, <code>E7#9</code>, <code>C6/9</code>,{" "}
-              <code>F7alt</code>, <code>Am7/E</code>, <code>Cno5</code>.
+              <code>F7alt</code>, <code>Am7/E</code>, <code>Am/G#</code>, <code>Cno5</code>.
             </p>
           </>
         )}
@@ -225,6 +225,12 @@ export function App() {
                   <span>{t.label}</span>
                 </span>
               ))}
+              {spec.addedBass && (
+                <span className="tone-pill role-bass" title="Slash bass from outside the chord">
+                  <b>{spec.addedBass.noteName}</b>
+                  <span>bass</span>
+                </span>
+              )}
             </span>
           </div>
         )}

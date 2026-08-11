@@ -20,7 +20,8 @@ export type Role =
   | "fifth"
   | "sixth"
   | "seventh"
-  | "extension"; // 9 / 11 / 13
+  | "extension" // 9 / 11 / 13
+  | "bass"; // a slash bass that is not one of the chord's own tones (Am/G#)
 
 export interface Tone {
   /** Scale degree: 1,2,3,4,5,6,7,9,11,13. */
@@ -47,6 +48,13 @@ export interface ChordSpec {
   /** Optional slash bass, as a pitch class. */
   bassName: string | null;
   bassChroma: number | null;
+  /**
+   * Set only when the slash bass is *not* already one of `tones` — Am/G#,
+   * Dm/B, C/F#. It is deliberately kept out of `tones`: it is not part of the
+   * harmony the omission rules reason about, it is a single note that has to
+   * sit below the chord, and it may not be doubled anywhere above.
+   */
+  addedBass: Tone | null;
   /** Human-readable notes about the chord itself (not about a voicing). */
   warnings: string[];
 }
@@ -430,15 +438,48 @@ function finishSpec(
   }
 
   const rootChroma = Note.chroma(rootName) ?? 0;
+  const bassChroma = bassName ? (Note.chroma(bassName) ?? null) : null;
+
+  /*
+   * A slash bass that isn't in the chord is not a mistake — Am/G#, Dm/B and
+   * C/F# are ordinary line-cliché and pedal-point writing. Give it a tone of
+   * its own so the search can actually fret it, marked `bass` so nothing
+   * mistakes it for part of the harmony: it is not a candidate for omission,
+   * and it belongs on the lowest sounding string only.
+   */
+  let addedBass: Tone | null = null;
+  if (bassChroma !== null && !tones.some((t) => (rootChroma + t.semitones) % 12 === bassChroma)) {
+    addedBass = makeBassTone(rootName, bassName as string);
+    warnings.push(
+      `${addedBass.noteName} isn't a tone of ${symbol.split("/")[0]} — it's played as a bass note under the chord (the ${addedBass.label}), on the lowest string only.`,
+    );
+  }
+
   return {
     symbol,
     rootName,
     rootChroma,
     tones,
     bassName,
-    bassChroma: bassName ? (Note.chroma(bassName) ?? null) : null,
+    bassChroma,
+    addedBass,
     warnings,
   };
+}
+
+/**
+ * The slash bass as a degree of the chord's root, so it can be labelled and
+ * coloured like any other tone. `Note.distance` spells a flattened root as a
+ * diminished octave ("A" -> "Ab" is 8d), which folds back to a b1.
+ */
+function makeBassTone(rootName: string, bassName: string): Tone {
+  const distance = Note.distance(rootName, bassName);
+  const { degree, alter } = intervalToDegree(distance || "1P");
+  const simple = degree > 7 ? degree - 7 : degree;
+  const tone = makeTone(simple, alter, rootName);
+  // `altered` would make the omission rules treat it as the point of the
+  // chord, and its degree is the root's business, not the bass note's.
+  return { ...tone, role: "bass", altered: false, noteName: bassName };
 }
 
 export interface ProgressionEntry {

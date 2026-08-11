@@ -121,6 +121,21 @@ export function analyseTones(spec: ChordSpec, opts: RuleOptions): ToneRule[] {
             "A perfect 5th is the most expendable tone — it adds no colour the root doesn't already imply.",
         };
 
+      case "bass":
+        /*
+         * A slash bass from outside the chord lives on `spec.addedBass`, not in
+         * `spec.tones`, precisely because it isn't harmony the omission rules
+         * have anything to say about: the search requires it on the lowest
+         * string outright. Handled here only so the switch stays exhaustive.
+         */
+        return {
+          tone,
+          required: true,
+          omissionCost: Infinity,
+          reason: null,
+          explanation: `${tone.noteName} is the slash bass — it has to be the lowest note.`,
+        };
+
       case "extension": {
         if (topExtensionDegree !== null && tone.degree === topExtensionDegree) {
           return {

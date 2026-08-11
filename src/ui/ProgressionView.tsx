@@ -41,6 +41,12 @@ export function ProgressionView({ text, tuning, opts, showDegrees }: Props) {
                     <em>{t.label}</em>
                   </span>
                 ))}
+                {entry.spec.addedBass && (
+                  <span className="mini-tone role-bass">
+                    {entry.spec.addedBass.noteName}
+                    <em>bass</em>
+                  </span>
+                )}
               </div>
             )}
             {result && !result.emptyHint && (

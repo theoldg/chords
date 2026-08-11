@@ -81,12 +81,21 @@ export function findVoicings(
     if (!existing || (t.altered && !existing.altered)) toneByChroma.set(chroma, t);
   }
 
+  /*
+   * A slash bass outside the chord (Am/G#) is a pitch class the harmony never
+   * contains, so it has to be admitted as a candidate fret in its own right —
+   * otherwise the search can only ever offer shapes with the wrong bass. Where
+   * it is allowed to sound is evaluate()'s business: lowest string, once.
+   */
+  const addedBassChroma = spec.addedBass !== null ? spec.bassChroma : null;
+
   const strings = tuning.strings;
   // Candidate frets per string, plus `null` for muted.
   const candidates: (number | null)[][] = strings.map((s) => {
     const out: (number | null)[] = [null];
     for (let fret = 0; fret <= opts.maxFret; fret++) {
-      if (toneByChroma.has(midiToPitchClass(s.midi + fret))) out.push(fret);
+      const chroma = midiToPitchClass(s.midi + fret);
+      if (toneByChroma.has(chroma) || chroma === addedBassChroma) out.push(fret);
     }
     return out;
   });
@@ -157,7 +166,11 @@ function buildEmptyHint(spec: ChordSpec, opts: SearchOptions): string {
   if (opts.minSoundingStrings > 3) bits.push("lower the minimum number of strings");
   if (!opts.allowInnerMutes) bits.push("allow skipped strings");
   const tail = bits.length ? ` Try: ${bits.join(", ")}.` : "";
-  return `No playable shape for ${spec.symbol} in this tuning under the current constraints.${tail}`;
+  const bass =
+    spec.addedBass !== null
+      ? ` Every shape has to put ${spec.addedBass.noteName} on the lowest sounding string, since it isn't a tone of the chord.`
+      : "";
+  return `No playable shape for ${spec.symbol} in this tuning under the current constraints.${bass}${tail}`;
 }
 
 function evaluate(
@@ -168,17 +181,33 @@ function evaluate(
   rules: ToneRule[],
   opts: SearchOptions,
 ): Voicing | null {
+  const addedBass = spec.addedBass;
+  const addedBassChroma = addedBass !== null ? spec.bassChroma : null;
+
   const notes: VoicingNote[] = [];
   for (let i = 0; i < frets.length; i++) {
     const fret = frets[i];
     if (fret === null) continue;
     const midi = strings[i].midi + fret;
-    const tone = toneByChroma.get(midiToPitchClass(midi));
+    const chroma = midiToPitchClass(midi);
+    const tone =
+      chroma === addedBassChroma && addedBass !== null ? addedBass : toneByChroma.get(chroma);
     if (!tone) return null;
     notes.push({ stringIndex: i, fret, midi, tone });
   }
 
   if (notes.length < opts.minSoundingStrings) return null;
+
+  /*
+   * A bass note from outside the chord only works as a bass note. Am/G# with
+   * the G# in the middle of the voicing is Ammaj7, and doubled an octave up it
+   * is a semitone clash against the root — so it sounds on the lowest string
+   * and nowhere else, and a shape that hasn't got it isn't the chord asked for.
+   */
+  if (addedBass !== null) {
+    if (notes[0].tone !== addedBass) return null;
+    if (notes.some((n, i) => i > 0 && n.tone === addedBass)) return null;
+  }
 
   /*
    * Silencing a string is not equally easy everywhere, and treating it as a
@@ -206,8 +235,12 @@ function evaluate(
   }
   if (innerMutes > 0 && !opts.allowInnerMutes) return null;
 
-  // Required tones present?
-  const presentDegrees = new Set(notes.map((n) => n.tone.degree));
+  // Required tones present? The added bass doesn't count towards them — its
+  // degree can collide with a real one (Am7/G# is a natural 7 under a b7) and
+  // it would otherwise satisfy a rule for a note nobody is playing.
+  const presentDegrees = new Set(
+    notes.filter((n) => n.tone.role !== "bass").map((n) => n.tone.degree),
+  );
   const omitted: { tone: Tone; label: string }[] = [];
   let omissionCost = 0;
   for (const rule of rules) {
@@ -309,7 +342,13 @@ function evaluate(
   const bassTone = notes[0].tone;
   if (spec.bassChroma !== null) {
     const wantedBass = midiToPitchClass(notes[0].midi) === spec.bassChroma;
-    if (!wantedBass) score += 5;
+    // Charged, not rejected: a slash bass that is a chord tone still leaves a
+    // playable chord when it can't be reached. Say so rather than let the
+    // shape pass itself off as the inversion that was asked for.
+    if (!wantedBass) {
+      score += 5;
+      flags.push({ kind: "warn", text: `${spec.bassName} is not the lowest note` });
+    }
   } else {
     if (bassTone.role === "root") score -= 2.5;
     else if (bassTone.role === "fifth") score += 0.5;

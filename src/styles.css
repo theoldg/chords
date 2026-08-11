@@ -21,6 +21,7 @@
   --role-sixth: #4a5ea8;
   --role-extension: #8a4fa8;
   --role-suspension: #2f6d4f;
+  --role-bass: #7a6a3f;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -46,6 +47,7 @@
     --role-sixth: #8fa1e8;
     --role-extension: #c791e0;
     --role-suspension: #79c69c;
+    --role-bass: #cbb277;
   }
 }
 
@@ -450,6 +452,7 @@ code {
 .role-sixth { --role-colour: var(--role-sixth); color: var(--role-colour); }
 .role-extension { --role-colour: var(--role-extension); color: var(--role-colour); }
 .role-suspension { --role-colour: var(--role-suspension); color: var(--role-colour); }
+.role-bass { --role-colour: var(--role-bass); color: var(--role-colour); }
 
 /* --- options --- */
 
@@ -609,6 +612,7 @@ code {
 .dot.role-sixth { fill: var(--role-sixth); }
 .dot.role-extension { fill: var(--role-extension); }
 .dot.role-suspension { fill: var(--role-suspension); }
+.dot.role-bass { fill: var(--role-bass); }
 .dot-label {
   fill: #fff;
   font-size: 9.5px;

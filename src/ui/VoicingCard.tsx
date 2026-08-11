@@ -63,9 +63,13 @@ export function VoicingCard({
         {voicing.bassTone && voicing.bassTone.role !== "root" && (
           <span
             className={`badge bass role-${voicing.bassTone.role}`}
-            title="The lowest string is not the root"
+            title={
+              voicing.bassTone.role === "bass"
+                ? "The lowest string is the slash bass, from outside the chord"
+                : "The lowest string is not the root"
+            }
           >
-            over {voicing.bassTone.label}
+            over {voicing.bassTone.role === "bass" ? voicing.bassTone.noteName : voicing.bassTone.label}
           </span>
         )}
         {voicing.omitted.map((o) => {
