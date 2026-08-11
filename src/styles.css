@@ -810,7 +810,12 @@ code {
   overflow-wrap: break-word;
   pointer-events: none;
 }
+/* `display: block` is load-bearing: a textarea is inline-level by default, so the
+   box would be a few pixels taller than the field — room for a descender under
+   its baseline — and both `inset: 0` layers below would stretch into that gap
+   and show under the field's bottom border. */
 .prog-input textarea.text-area {
+  display: block;
   position: relative;
   background: transparent;
 }
