@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import type { ToneRule } from "../theory/rules";
 import type { Voicing } from "../theory/search";
 import type { Tuning } from "../theory/tuning";
@@ -32,6 +33,22 @@ interface Props {
  * had to drop and why, anything that will fight back under the fingers, and
  * whether it is sitting on something other than its root.
  */
+/**
+ * How wide the fret row needs to be, in ems, so the stylesheet can pick a size
+ * that fits the card.
+ *
+ * Measured from the digits actually in this shape rather than from the worst a
+ * shape could be: budgeting two digits per string everywhere would shrink
+ * `x 0 2 0 1 0` to pay for the 11th-fret barre two cards over. Monospace, so
+ * the count of characters is the measurement — 0.62em is the widest advance
+ * among the fonts in the mono stack, and the 0.35em between entries is what
+ * keeps them reading as six numbers rather than one.
+ */
+function fretBudget(frets: (number | null)[]): number {
+  const characters = frets.reduce<number>((n, f) => n + (f === null ? 1 : String(f).length), 0);
+  return characters * 0.62 + (frets.length - 1) * 0.35;
+}
+
 export function VoicingCard({
   voicing,
   tuning,
@@ -44,8 +61,20 @@ export function VoicingCard({
   return (
     <article className={className ? `card ${className}` : "card"} role={role}>
       <div className="card-top">
-        <span className="mono frets">
-          {voicing.frets.map((f) => (f === null ? "x" : f)).join(" ")}
+        {/*
+          One cell per string rather than one joined string, and a budget of how
+          much room this particular row needs, so the stylesheet can size it to
+          fit instead of wrapping. Hidden from screen readers because the
+          diagram below already announces the same frets in its label.
+        */}
+        <span
+          className="mono frets"
+          aria-hidden="true"
+          style={{ "--fret-budget": fretBudget(voicing.frets) } as CSSProperties}
+        >
+          {voicing.frets.map((f, i) => (
+            <span key={i}>{f === null ? "x" : f}</span>
+          ))}
         </span>
         <button
           type="button"

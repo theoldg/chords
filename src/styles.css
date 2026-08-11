@@ -564,17 +564,38 @@ code {
   box-shadow: var(--shadow);
   display: flex;
   flex-direction: column;
+  /* So the fret row can size itself against the card it sits in. */
+  container-type: inline-size;
 }
 .card-top {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 10px;
   margin-bottom: 2px;
 }
+
+/*
+ * The fret row has to hold one line at its worst case: a seven-string tuning
+ * with every string at a two-digit fret, on the narrowest card the grid will
+ * make. It used to be one letter-spaced string that simply wrapped, which put a
+ * stray "0" on a second line under even the common six-string shapes.
+ *
+ * It now sizes itself against the card. The card publishes --fret-budget, the
+ * width this particular row needs in ems (see fretBudget in VoicingCard), and
+ * the type shrinks to whatever is left of the card's own width after the play
+ * button and the gap. Capped at the 13px it always was, which is what every
+ * card wide enough to afford it still gets — the shrinking is reserved for the
+ * shapes high up the neck that actually need it.
+ */
 .frets {
-  font-size: 13px;
-  letter-spacing: 0.13em;
+  display: flex;
+  justify-content: space-between;
+  flex: 1 1 auto;
+  min-width: 0;
+  white-space: nowrap;
   color: var(--ink-soft);
+  font-size: min(13px, calc((100cqi - 42px) / var(--fret-budget, 7)));
 }
 .play {
   border: 1px solid var(--line);
