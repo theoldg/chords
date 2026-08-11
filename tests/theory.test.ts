@@ -263,7 +263,7 @@ describe("voicing search", () => {
     const res = search("G", "EADGBE", { maxResults: 12 });
     const usesAll = res.voicings
       .slice(0, 4)
-      .some((v) => v.notes.length === 6 && v.flags.some((f) => f.text === "All strings"));
+      .some((v) => v.notes.length === 6);
     expect(usesAll).toBe(true);
   });
 

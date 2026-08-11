@@ -89,7 +89,7 @@ export function ProgressionView({ text, tuning, opts, showDegrees }: Props) {
                     })}
                     {v.omitted.length === 0 && <span className="badge complete">all tones</span>}
                     {v.flags
-                      .filter((f) => f.kind === "warn" || f.text === "All strings")
+                      .filter((f) => f.kind === "warn")
                       .map((f) => (
                         <span className={`badge ${f.kind}`} key={f.text}>
                           {f.text}

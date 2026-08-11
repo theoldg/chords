@@ -203,9 +203,6 @@ function evaluate(
 
   const awkward = handAwkwardness(frets, fretted);
   score += awkward.straddle;
-  if (awkward.straddle >= 1.5) {
-    flags.push({ kind: "warn", text: "Fingers have to straddle" });
-  }
 
   // Prefer shapes near the nut. Cheap to reach, easier to hold, and they get
   // to use open strings. Scaled so a shape twelve frets up pays about four
@@ -218,7 +215,6 @@ function evaluate(
   score += lowSideMutes * 0.4 + highSideMutes * 2.2;
   if (lowSideMutes + highSideMutes + innerMutes === 0) {
     score -= 1.2;
-    flags.push({ kind: "info", text: "All strings" });
   }
 
   /*
@@ -277,7 +273,6 @@ function evaluate(
   }
   if (muddy) {
     score += muddy * 0.8;
-    flags.push({ kind: "warn", text: "Muddy in the low end" });
   }
   if (harsh) {
     score += harsh * 3;
