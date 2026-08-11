@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { parseProgression } from "../theory/chord";
 import { findVoicings, type SearchOptions } from "../theory/search";
 import type { Tuning } from "../theory/tuning";
@@ -26,6 +26,26 @@ export function ProgressionView({ text, tuning, opts, showDegrees }: Props) {
         : null,
     }));
   }, [entries, tuning, opts]);
+
+  /*
+   * Send every strip back to its first shape when the search that filled it
+   * changes — a retuning, or any constraint that re-runs it.
+   *
+   * A strip keeps its scroll offset across a re-render, and both of those
+   * inputs replace the shapes in it with a different set in a different order.
+   * Being left at card nine then means landing in the middle of voicings you
+   * have not seen, with the best-ranked ones off to the left where nothing
+   * suggests they exist. The strips are ranked lists, and a new list starts at
+   * the top.
+   *
+   * Editing the progression is not in here because it needs nothing: a row
+   * whose chord changed is a different row, keyed differently, and mounts
+   * scrolled to the start already.
+   */
+  const strips = useRef(new Map<number, HTMLDivElement>());
+  useEffect(() => {
+    for (const el of strips.current.values()) el.scrollLeft = 0;
+  }, [tuning, opts]);
 
   return (
     <div className="progression">
@@ -58,7 +78,14 @@ export function ProgressionView({ text, tuning, opts, showDegrees }: Props) {
           {result?.emptyHint && <p className="empty small">{result.emptyHint}</p>}
 
           {result && result.voicings.length > 0 && (
-            <div className="strip" role="list">
+            <div
+              className="strip"
+              role="list"
+              ref={(el) => {
+                if (el) strips.current.set(i, el);
+                else strips.current.delete(i);
+              }}
+            >
               {tuning &&
                 result.voicings.map((v) => (
                   <VoicingCard

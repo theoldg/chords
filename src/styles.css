@@ -1,54 +1,58 @@
+/*
+ * One palette, two values per token, written with `light-dark()` so the light
+ * and dark readings of a colour sit on the same line and can never drift apart
+ * — an earlier version kept dark in a `prefers-color-scheme` block and a token
+ * added to one list was easy to forget in the other.
+ *
+ * Which half is in force is decided entirely by `color-scheme`, which is what
+ * lets the theme toggle work: `data-theme` pins it (see ui/theme.ts), and with
+ * no attribute it stays `light dark`, i.e. whatever the OS asks for. It also
+ * hands the browser the scheme for the things this stylesheet doesn't paint —
+ * scrollbars, checkboxes, range tracks, form autofill.
+ */
 :root {
-  --bg: #f6f5f2;
-  --panel: #ffffff;
-  --ink: #1b1a18;
-  --ink-soft: #5d5a54;
-  --ink-faint: #8d8880;
-  --line: #e2ded6;
-  --accent: #b4532a;
-  --accent-soft: #f3e2da;
-  --ok: #2f6d4f;
-  --ok-soft: #e0efe6;
-  --warn: #8a6100;
-  --warn-soft: #f8ecd2;
-  --shadow: 0 1px 2px rgba(0, 0, 0, 0.05), 0 6px 20px rgba(0, 0, 0, 0.04);
+  color-scheme: light dark;
+
+  --bg: light-dark(#f6f5f2, #16151a);
+  --panel: light-dark(#ffffff, #1f1e24);
+  --ink: light-dark(#1b1a18, #f0ede8);
+  --ink-soft: light-dark(#5d5a54, #b3aea6);
+  --ink-faint: light-dark(#8d8880, #837e77);
+  --line: light-dark(#e2ded6, #333138);
+  --accent: light-dark(#b4532a, #e08a5e);
+  --accent-soft: light-dark(#f3e2da, #3a2a22);
+  --ok: light-dark(#2f6d4f, #79c69c);
+  --ok-soft: light-dark(#e0efe6, #22332a);
+  --warn: light-dark(#8a6100, #e3b662);
+  --warn-soft: light-dark(#f8ecd2, #3a3020);
+  /* Only the colours vary; the geometry is the same in both schemes. */
+  --shadow-near: light-dark(rgba(0, 0, 0, 0.05), rgba(0, 0, 0, 0.4));
+  --shadow-far: light-dark(rgba(0, 0, 0, 0.04), rgba(0, 0, 0, 0.3));
+  --shadow: 0 1px 2px var(--shadow-near), 0 6px 20px var(--shadow-far);
   --radius: 12px;
 
-  --role-root: #b4532a;
-  --role-third: #2f6d4f;
-  --role-fifth: #8d8880;
-  --role-seventh: #4a5ea8;
-  --role-sixth: #4a5ea8;
-  --role-extension: #8a4fa8;
-  --role-suspension: #2f6d4f;
-  --role-bass: #7a6a3f;
+  /* Fret and string lines are their own token rather than --line: on dark they
+     need to read against the panel, not against the page. */
+  --fretline: light-dark(#e2ded6, #46434c);
+  /* Alpha baked in, because `light-dark()` takes colours and not the bare
+     opacity number the two schemes used to differ by. */
+  --inlay: light-dark(rgba(27, 26, 24, 0.13), rgba(255, 255, 255, 0.3));
+
+  --role-root: light-dark(#b4532a, #e08a5e);
+  --role-third: light-dark(#2f6d4f, #79c69c);
+  --role-fifth: light-dark(#8d8880, #928c84);
+  --role-seventh: light-dark(#4a5ea8, #8fa1e8);
+  --role-sixth: light-dark(#4a5ea8, #8fa1e8);
+  --role-extension: light-dark(#8a4fa8, #c791e0);
+  --role-suspension: light-dark(#2f6d4f, #79c69c);
+  --role-bass: light-dark(#7a6a3f, #cbb277);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #16151a;
-    --panel: #1f1e24;
-    --ink: #f0ede8;
-    --ink-soft: #b3aea6;
-    --ink-faint: #837e77;
-    --line: #333138;
-    --accent: #e08a5e;
-    --accent-soft: #3a2a22;
-    --ok: #79c69c;
-    --ok-soft: #22332a;
-    --warn: #e3b662;
-    --warn-soft: #3a3020;
-    --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 26px rgba(0, 0, 0, 0.3);
-
-    --role-root: #e08a5e;
-    --role-third: #79c69c;
-    --role-fifth: #928c84;
-    --role-seventh: #8fa1e8;
-    --role-sixth: #8fa1e8;
-    --role-extension: #c791e0;
-    --role-suspension: #79c69c;
-    --role-bass: #cbb277;
-  }
+:root[data-theme="light"] {
+  color-scheme: light;
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
 }
 
 * {
@@ -134,11 +138,121 @@ code {
 
 /* Collapsed, the settings panel is a header row and the tuning rail: enough to
    see what is set and to change the one thing you change often. */
+.settings {
+  transition: padding var(--fold, 260ms) var(--ease-fold);
+}
 .settings.open {
   padding-bottom: 20px;
 }
 .settings:not(.open) {
   padding: 12px 20px;
+}
+
+/*
+ * The unfold.
+ *
+ * Animated as a grid row from 0fr to 1fr rather than a height, because the
+ * panel's open height is whatever its contents come to — a number no stylesheet
+ * knows and that changes with the viewport, the tuning readout's wrapping and
+ * whether an error line is showing. `max-height` to a guessed ceiling is the
+ * usual workaround and it buys a visibly wrong easing curve: the visible part
+ * of the travel finishes early and the rest of the duration animates empty
+ * space. `1fr` resolves to exactly the content's height, so the motion tracks
+ * what is actually moving.
+ *
+ * `overflow: hidden` on the child is load-bearing twice over: it clips the
+ * contents while the row is shorter than they are, and it is what lets a grid
+ * item's automatic minimum size fall to zero so the 0fr row can actually
+ * collapse.
+ */
+:root {
+  --fold: 260ms;
+  /* Fast out of the gate, long settle — motion that reads as a panel being let
+     go rather than driven. */
+  --ease-fold: cubic-bezier(0.32, 0.72, 0, 1);
+}
+.settings-body {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  /* Kept out of the accessibility tree and out of tab order while folded away;
+     `inert` on the element covers the rest. The delay holds it visible for the
+     length of the close so the contents don't blink out at the first frame. */
+  visibility: hidden;
+  transition:
+    grid-template-rows var(--fold) var(--ease-fold),
+    opacity 140ms ease,
+    visibility 0s linear var(--fold);
+}
+.settings.open .settings-body {
+  grid-template-rows: 1fr;
+  opacity: 1;
+  visibility: visible;
+  transition:
+    grid-template-rows var(--fold) var(--ease-fold),
+    /* Fades in behind the expansion, so the first thing you see is the space
+       being made rather than text sliding under a clip edge. */ opacity 200ms ease 60ms,
+    visibility 0s;
+}
+.settings-body > * {
+  overflow: hidden;
+  min-height: 0;
+}
+/*
+ * The rail folds by the same mechanism, in the opposite direction: the two
+ * swap places over one duration, so the panel's height moves once instead of
+ * jumping as the rail leaves and then easing as the body arrives.
+ *
+ * `overflow: visible clip` rather than `hidden`: the rail bleeds 20px past the
+ * panel's padding on both sides on purpose, so that a chip cut off at the edge
+ * reads as "there is more". Clipping both axes — which `hidden` would do — cuts
+ * that bleed off and takes the edge fade with it. Clipping only the block axis
+ * keeps the bleed while still collapsing the row, and still drops the item's
+ * automatic minimum height to zero.
+ */
+.rail-fold {
+  display: grid;
+  grid-template-rows: 1fr;
+  transition: grid-template-rows var(--fold) var(--ease-fold);
+}
+.settings.open .rail-fold {
+  grid-template-rows: 0fr;
+}
+.rail-fold > * {
+  overflow: visible clip;
+  min-height: 0;
+}
+/* A short lift under the fold, so the rail reads as being drawn up behind the
+   summary line rather than simply squashed. */
+.rail-fold .tuning-rail {
+  transition:
+    opacity 160ms ease 60ms,
+    transform var(--fold) var(--ease-fold);
+}
+.settings.open .rail-fold .tuning-rail {
+  opacity: 0;
+  transform: translateY(-8px);
+  transition:
+    opacity 140ms ease,
+    transform var(--fold) var(--ease-fold);
+}
+
+/* Someone who has asked the OS for less motion gets the same states, reached
+   without travel. */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --fold: 1ms;
+  }
+  .settings-body,
+  .settings.open .settings-body,
+  .rail-fold .tuning-rail,
+  .settings.open .rail-fold .tuning-rail {
+    transition-duration: 1ms;
+    transition-delay: 0s;
+  }
+  .settings.open .rail-fold .tuning-rail {
+    transform: none;
+  }
 }
 .settings-summary {
   display: flex;
@@ -648,26 +762,13 @@ code {
 }
 .fret,
 .string {
-  stroke: var(--line);
+  stroke: var(--fretline);
   stroke-width: 1.4;
-}
-@media (prefers-color-scheme: dark) {
-  .fret,
-  .string {
-    stroke: #46434c;
-  }
 }
 /* Fingerboard inlays: present enough to count off 5-7-9-12 at a glance, faint
    enough that a dot is never mistaken for a note. */
 .inlay circle {
-  fill: var(--ink);
-  opacity: 0.13;
-}
-@media (prefers-color-scheme: dark) {
-  .inlay circle {
-    fill: #fff;
-    opacity: 0.3;
-  }
+  fill: var(--inlay);
 }
 .position-label {
   fill: var(--accent);

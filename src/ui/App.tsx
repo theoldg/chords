@@ -14,6 +14,7 @@ import {
   reviveOptions,
   usePersistent,
 } from "./settings";
+import { THEME_LABELS, THEMES, useTheme, type Theme } from "./theme";
 import { TuningRail } from "./TuningRail";
 import { VoicingCard } from "./VoicingCard";
 
@@ -35,6 +36,9 @@ export function App() {
   const [opts, setOpts] = usePersistent("options", DEFAULT_SEARCH_OPTIONS, reviveOptions);
   const [showDegrees, setShowDegrees] = usePersistent("showDegrees", true, asBoolean);
   const [settingsOpen, setSettingsOpen] = usePersistent("settingsOpen", false, asBoolean);
+  const [theme, setTheme] = usePersistent<Theme>("theme", "system", asOneOf(THEMES));
+
+  useTheme(theme);
 
   const { tuning, error: tuningError } = useMemo(() => parseTuning(tuningText), [tuningText]);
 
@@ -82,140 +86,171 @@ export function App() {
           </span>
         </button>
 
-        {!settingsOpen && (
-          <TuningRail
-            value={tuningText}
-            onChange={setTuningText}
-            onEdit={() => setSettingsOpen(true)}
-          />
-        )}
-
-        <div id="settings-body" hidden={!settingsOpen}>
-          <h3 className="settings-head">Tuning</h3>
-          <div className="chip-row presets">
-            {TUNING_PRESETS.map((p) => (
-              <button
-                key={p.label}
-                type="button"
-                className={`chip ghost ${tuningText.toUpperCase() === p.value.toUpperCase() ? "on" : ""}`}
-                onClick={() => setTuningText(p.value)}
-                title={p.note}
-              >
-                {p.label}
-                {p.label.toUpperCase() !== p.value.toUpperCase() && (
-                  <span className="chip-hint">{p.value}</span>
-                )}
-              </button>
-            ))}
-          </div>
-          <div className="row">
-            <input
-              className={`text-input mono ${tuningError ? "bad" : ""}`}
+        {/* Mounted whether or not the panel is open, so that opening it folds
+            the rail away in the same motion that unfolds the body rather than
+            cutting it out from under one. It also keeps the rail measurable —
+            it centres the selected preset by measuring its own width, which
+            reads as zero on an element that isn't laid out. */}
+        <div className="rail-fold" inert={settingsOpen}>
+          <div>
+            <TuningRail
               value={tuningText}
-              onChange={(e) => setTuningText(e.target.value)}
-              spellCheck={false}
-              aria-label="Tuning"
+              onChange={setTuningText}
+              onEdit={() => setSettingsOpen(true)}
             />
-            {tuning && (
-              <div className="tuning-readout">
-                {tuning.strings.map((s, i) => (
-                  <span key={i} className="string-pill">
-                    {s.name}
-                  </span>
-                ))}
-              </div>
-            )}
           </div>
-          {tuningError ? (
-            <p className="error">{tuningError}</p>
-          ) : (
-            <p className="hint">
-              Uppercase note letters, lowercase <code>b</code> for flats (<code>EbADGBE</code>). Add
-              a digit to pin an octave (<code>D2A2E3G3A3D4</code>). Octaves are otherwise assigned
-              ascending from the lowest string.
-            </p>
-          )}
+        </div>
 
-          <h3 className="settings-head">Constraints</h3>
-          {/*
-            Sliders and tick boxes are laid out as two grids rather than one, so
-            the three of each keep their own row on a wide screen: a single
-            auto-fitting grid put four items on the first row and two on the
-            second, which read as an arbitrary grouping. Both collapse to one
-            column on a phone.
-          */}
-          <div className="opts sliders">
-            <label className="opt">
-              <span>
-                Fret stretch <b>{opts.maxSpan}</b>
-              </span>
+        {/* Two elements, because the animation needs one box to size the row
+            and one to be clipped by it; see .settings-body in styles.css.
+            `inert` rather than `hidden`, which would cut the transition off at
+            the first frame. */}
+        <div id="settings-body" className="settings-body" inert={!settingsOpen}>
+          <div>
+            <h3 className="settings-head">Tuning</h3>
+            <div className="chip-row presets">
+              {TUNING_PRESETS.map((p) => (
+                <button
+                  key={p.label}
+                  type="button"
+                  className={`chip ghost ${tuningText.toUpperCase() === p.value.toUpperCase() ? "on" : ""}`}
+                  onClick={() => setTuningText(p.value)}
+                  title={p.note}
+                >
+                  {p.label}
+                  {p.label.toUpperCase() !== p.value.toUpperCase() && (
+                    <span className="chip-hint">{p.value}</span>
+                  )}
+                </button>
+              ))}
+            </div>
+            <div className="row">
               <input
-                type="range"
-                min={OPTION_LIMITS.maxSpan.min}
-                max={OPTION_LIMITS.maxSpan.max}
-                value={opts.maxSpan}
-                onChange={(e) => setOpt("maxSpan", Number(e.target.value))}
+                className={`text-input mono ${tuningError ? "bad" : ""}`}
+                value={tuningText}
+                onChange={(e) => setTuningText(e.target.value)}
+                spellCheck={false}
+                aria-label="Tuning"
               />
-            </label>
-            <label className="opt">
-              <span>
-                Highest fret <b>{opts.maxFret}</b>
-              </span>
-              <input
-                type="range"
-                min={OPTION_LIMITS.maxFret.min}
-                max={OPTION_LIMITS.maxFret.max}
-                value={opts.maxFret}
-                onChange={(e) => setOpt("maxFret", Number(e.target.value))}
-              />
-            </label>
-            <label className="opt">
-              <span>
-                Min. strings <b>{opts.minSoundingStrings}</b>
-              </span>
-              <input
-                type="range"
-                min={OPTION_LIMITS.minSoundingStrings.min}
-                max={OPTION_LIMITS.minSoundingStrings.max}
-                value={opts.minSoundingStrings}
-                onChange={(e) => setOpt("minSoundingStrings", Number(e.target.value))}
-              />
-            </label>
-          </div>
-          <div className="opts checks">
-            <label className="opt check">
-              <input
-                type="checkbox"
-                checked={opts.allowRootOmission}
-                onChange={(e) => setOpt("allowRootOmission", e.target.checked)}
-              />
-              <span>
-                A bassist has the root
-                <small>Unlocks rootless voicings</small>
-              </span>
-            </label>
-            <label className="opt check">
-              <input
-                type="checkbox"
-                checked={opts.allowInnerMutes}
-                onChange={(e) => setOpt("allowInnerMutes", e.target.checked)}
-              />
-              <span>
-                Allow skipped strings
-                <small>Needs deliberate muting</small>
-              </span>
-            </label>
-            <label className="opt check">
-              <input
-                type="checkbox"
-                checked={showDegrees}
-                onChange={(e) => setShowDegrees(e.target.checked)}
-              />
-              <span>
-                Label scale degrees
-                <small>R, b3, 11 … on each dot</small>
-              </span>
-            </label>
+              {tuning && (
+                <div className="tuning-readout">
+                  {tuning.strings.map((s, i) => (
+                    <span key={i} className="string-pill">
+                      {s.name}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+            {tuningError ? (
+              <p className="error">{tuningError}</p>
+            ) : (
+              <p className="hint">
+                Uppercase note letters, lowercase <code>b</code> for flats (<code>EbADGBE</code>). Add
+                a digit to pin an octave (<code>D2A2E3G3A3D4</code>). Octaves are otherwise assigned
+                ascending from the lowest string.
+              </p>
+            )}
+  
+            <h3 className="settings-head">Constraints</h3>
+            {/*
+              Sliders and tick boxes are laid out as two grids rather than one, so
+              the three of each keep their own row on a wide screen: a single
+              auto-fitting grid put four items on the first row and two on the
+              second, which read as an arbitrary grouping. Both collapse to one
+              column on a phone.
+            */}
+            <div className="opts sliders">
+              <label className="opt">
+                <span>
+                  Fret stretch <b>{opts.maxSpan}</b>
+                </span>
+                <input
+                  type="range"
+                  min={OPTION_LIMITS.maxSpan.min}
+                  max={OPTION_LIMITS.maxSpan.max}
+                  value={opts.maxSpan}
+                  onChange={(e) => setOpt("maxSpan", Number(e.target.value))}
+                />
+              </label>
+              <label className="opt">
+                <span>
+                  Highest fret <b>{opts.maxFret}</b>
+                </span>
+                <input
+                  type="range"
+                  min={OPTION_LIMITS.maxFret.min}
+                  max={OPTION_LIMITS.maxFret.max}
+                  value={opts.maxFret}
+                  onChange={(e) => setOpt("maxFret", Number(e.target.value))}
+                />
+              </label>
+              <label className="opt">
+                <span>
+                  Min. strings <b>{opts.minSoundingStrings}</b>
+                </span>
+                <input
+                  type="range"
+                  min={OPTION_LIMITS.minSoundingStrings.min}
+                  max={OPTION_LIMITS.minSoundingStrings.max}
+                  value={opts.minSoundingStrings}
+                  onChange={(e) => setOpt("minSoundingStrings", Number(e.target.value))}
+                />
+              </label>
+            </div>
+            <div className="opts checks">
+              <label className="opt check">
+                <input
+                  type="checkbox"
+                  checked={opts.allowRootOmission}
+                  onChange={(e) => setOpt("allowRootOmission", e.target.checked)}
+                />
+                <span>
+                  A bassist has the root
+                  <small>Unlocks rootless voicings</small>
+                </span>
+              </label>
+              <label className="opt check">
+                <input
+                  type="checkbox"
+                  checked={opts.allowInnerMutes}
+                  onChange={(e) => setOpt("allowInnerMutes", e.target.checked)}
+                />
+                <span>
+                  Allow skipped strings
+                  <small>Needs deliberate muting</small>
+                </span>
+              </label>
+              <label className="opt check">
+                <input
+                  type="checkbox"
+                  checked={showDegrees}
+                  onChange={(e) => setShowDegrees(e.target.checked)}
+                />
+                <span>
+                  Label scale degrees
+                  <small>R, b3, 11 … on each dot</small>
+                </span>
+              </label>
+            </div>
+
+            <h3 className="settings-head">Appearance</h3>
+            {/* Three states, not a two-way switch: "Auto" is a choice in its own
+                right — keep following the OS — and someone who has made it
+                should go on following it when the OS flips at dusk. */}
+            <div className="seg theme-seg" role="group" aria-label="Theme">
+              {THEMES.map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  className={`seg-btn ${theme === t ? "on" : ""}`}
+                  aria-pressed={theme === t}
+                  onClick={() => setTheme(t)}
+                >
+                  {THEME_LABELS[t]}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       </section>
