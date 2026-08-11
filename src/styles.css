@@ -571,8 +571,10 @@ code {
   }
 }
 .position-label {
-  fill: var(--ink-faint);
-  font-size: 12px;
+  fill: var(--accent);
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
   font-family: ui-monospace, Menlo, monospace;
 }
 .barre {
@@ -584,10 +586,12 @@ code {
   stroke-width: 1.6;
   stroke-linecap: round;
 }
+/* The .role-* classes set `color`, so the ring and its degree label pick up
+   the same palette as the fretted dots through currentColor. */
 .open-mark {
   fill: none;
-  stroke: var(--ink-soft);
-  stroke-width: 1.6;
+  stroke: currentColor;
+  stroke-width: 1.8;
 }
 .dot {
   fill: var(--ink);
@@ -606,7 +610,7 @@ code {
   font-family: ui-monospace, Menlo, monospace;
 }
 .open-label {
-  fill: var(--ink-faint);
+  fill: currentColor;
   font-size: 9.5px;
   font-weight: 700;
   font-family: ui-monospace, Menlo, monospace;

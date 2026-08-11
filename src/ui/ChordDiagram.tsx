@@ -25,22 +25,40 @@ export function ChordDiagram({ voicing, tuning, showDegrees }: Props) {
       ? 0
       : Math.min(...fretted) - 1;
 
+  /*
+   * Which fret the shape sits at, called out from the 3rd position up. A
+   * windowed diagram has always needed it — nothing else says where you are on
+   * the neck — but a shape drawn from the nut needs it too once it leaves first
+   * position: x-3-5-5-5-3 and x-3-0-0-3-0 both start at the 3rd fret and used
+   * to be labelled only by the fret lines you had to count yourself.
+   */
+  const position = fretted.length ? Math.min(...fretted) : 0;
+  const showPosition = position >= 3;
+
+  const openTone = (stringIndex: number) =>
+    voicing.notes.find((n) => n.stringIndex === stringIndex && n.fret === 0)?.tone;
+
   const x = (stringIndex: number) => left + stringIndex * stringGap;
   const y = (fret: number) => top + (fret - startFret - 0.5) * fretGap;
 
+  // The origin sits left of the fretboard to leave room for a two-digit
+  // position marker; a 12th-fret shape overflowed even at the old size.
   return (
     <svg
-      viewBox={`0 0 ${width + 20} ${height}`}
+      viewBox={`-12 0 ${width + 32} ${height}`}
       className="diagram"
       role="img"
       aria-label={`Chord diagram, frets ${voicing.frets.map((f) => (f === null ? "muted" : f)).join(" ")}`}
     >
-      {/* Nut or position marker */}
-      {startFret === 0 ? (
+      {/* Nut */}
+      {startFret === 0 && (
         <rect x={left - 2} y={top - 5} width={(stringCount - 1) * stringGap + 4} height={5} rx={1.5} className="nut" />
-      ) : (
-        <text x={left - 10} y={top + fretGap * 0.62} className="position-label" textAnchor="end">
-          {startFret + 1}
+      )}
+
+      {/* Position marker, alongside the fret the shape starts on */}
+      {showPosition && (
+        <text x={left - 11} y={y(position) + 5.5} className="position-label" textAnchor="end">
+          {position}
         </text>
       )}
 
@@ -80,7 +98,8 @@ export function ChordDiagram({ voicing, tuning, showDegrees }: Props) {
         />
       )}
 
-      {/* Open / muted markers */}
+      {/* Open / muted markers. Open rings take the colour of the degree they
+          sound, so a diagram reads the same above the nut as below it. */}
       {voicing.frets.map((fret, i) =>
         fret === null ? (
           <g key={`m${i}`} className="muted-mark">
@@ -88,7 +107,13 @@ export function ChordDiagram({ voicing, tuning, showDegrees }: Props) {
             <line x1={x(i) + 5} y1={top - 18} x2={x(i) - 5} y2={top - 8} />
           </g>
         ) : fret === 0 ? (
-          <circle key={`o${i}`} cx={x(i)} cy={top - 13} r={5} className="open-mark" />
+          <circle
+            key={`o${i}`}
+            cx={x(i)}
+            cy={top - 13}
+            r={5}
+            className={`open-mark role-${openTone(i)?.role ?? "fifth"}`}
+          />
         ) : null,
       )}
 
@@ -115,7 +140,7 @@ export function ChordDiagram({ voicing, tuning, showDegrees }: Props) {
               key={`ol${n.stringIndex}`}
               x={x(n.stringIndex)}
               y={top - 24}
-              className="open-label"
+              className={`open-label role-${n.tone.role}`}
               textAnchor="middle"
             >
               {n.tone.label}
