@@ -13,7 +13,10 @@
  *     simply asks for new names.
  */
 
-const CACHE = "chord-shapes-v1";
+/* Bumped when a precached file changes: the manifest has a stable URL and is
+   served cache-first, so an installed copy keeps the old one until the cache
+   name moves. */
+const CACHE = "chord-shapes-v2";
 
 self.addEventListener("install", (event) => {
   // Take over immediately rather than waiting for every tab to close.

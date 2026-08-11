@@ -133,15 +133,21 @@ export interface TuningPreset {
   note?: string;
 }
 
+/**
+ * Order is the order they appear in the picker, and the picker is a single row
+ * that scrolls, so the front of this list is the part most people will ever
+ * see. The two altered tunings worth reaching for immediately sit right behind
+ * standard; the specialist instruments go to the back.
+ */
 export const TUNING_PRESETS: TuningPreset[] = [
   { label: "Standard", value: "EADGBE" },
+  { label: "DAEGAD", value: "DAEGAD", note: "fifths at the bottom" },
   { label: "DADGAD", value: "DADGAD", note: "Celtic / modal" },
   { label: "Drop D", value: "DADGBE" },
   { label: "Open G", value: "DGDGBD", note: "Keef" },
   { label: "Open D", value: "DADF#AD" },
   { label: "Open E", value: "EBEG#BE" },
   { label: "Open C", value: "CGCGCE" },
-  { label: "DAEGAD", value: "DAEGAD", note: "your example" },
   { label: "Half step down", value: "EbAbDbGbBbEb" },
   { label: "Bass (4)", value: "E1A1D2G2" },
   { label: "7-string", value: "B1EADGBE" },

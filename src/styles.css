@@ -132,12 +132,12 @@ code {
   font-weight: 600;
 }
 
-/* Collapsed, the settings panel is one row: a label and a digest of what is
-   currently set, so you can check the tuning without opening anything. */
-.settings[open] {
+/* Collapsed, the settings panel is a header row and the tuning rail: enough to
+   see what is set and to change the one thing you change often. */
+.settings.open {
   padding-bottom: 20px;
 }
-.settings:not([open]) {
+.settings:not(.open) {
   padding: 12px 20px;
 }
 .settings-summary {
@@ -146,10 +146,14 @@ code {
   gap: 10px;
   flex-wrap: wrap;
   cursor: pointer;
-  list-style: none;
-}
-.settings-summary::-webkit-details-marker {
-  display: none;
+  /* A real <button>, stripped back to the summary line it replaces. */
+  width: 100%;
+  background: none;
+  border: 0;
+  padding: 0;
+  color: inherit;
+  font: inherit;
+  text-align: left;
 }
 .settings-summary::before {
   content: "›";
@@ -159,8 +163,36 @@ code {
   font-size: 15px;
   line-height: 1;
 }
-.settings[open] .settings-summary::before {
+.settings.open .settings-summary::before {
   transform: rotate(90deg);
+}
+
+/*
+ * One scrolling row of tunings, bleeding to the panel's edges so a chip cut off
+ * at the right reads as "there is more" rather than as a layout bug. The edge
+ * fade says the same thing where a scrollbar would otherwise have to, since a
+ * scrollbar inside a one-line summary is more furniture than the row is worth.
+ */
+.tuning-rail {
+  display: flex;
+  gap: 7px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  margin: 11px -20px -12px;
+  padding: 2px 20px 12px;
+  scroll-snap-type: x proximity;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  -webkit-mask-image: linear-gradient(to right, transparent 0, #000 20px, #000 calc(100% - 26px), transparent 100%);
+  mask-image: linear-gradient(to right, transparent 0, #000 20px, #000 calc(100% - 26px), transparent 100%);
+}
+.tuning-rail::-webkit-scrollbar {
+  display: none;
+}
+.rail-chip {
+  flex: 0 0 auto;
+  scroll-snap-align: center;
 }
 .settings-title {
   font-size: 13px;
@@ -174,7 +206,7 @@ code {
   color: var(--ink-faint);
   margin-left: auto;
 }
-.settings[open] .settings-digest {
+.settings.open .settings-digest {
   display: none;
 }
 .settings-head {
@@ -277,6 +309,12 @@ code {
 .chip:hover {
   border-color: var(--ink-faint);
 }
+/* Ghost comes first so that `on` still wins the background on a chip wearing
+   both — otherwise the selected preset is white text on a transparent chip,
+   i.e. blank. */
+.chip.ghost {
+  background: transparent;
+}
 .chip.on {
   background: var(--accent);
   border-color: var(--accent);
@@ -285,9 +323,6 @@ code {
 .chip.on.alt {
   background: var(--role-extension);
   border-color: var(--role-extension);
-}
-.chip.ghost {
-  background: transparent;
 }
 .chip.small {
   padding: 5px 8px;
@@ -529,17 +564,38 @@ code {
   box-shadow: var(--shadow);
   display: flex;
   flex-direction: column;
+  /* So the fret row can size itself against the card it sits in. */
+  container-type: inline-size;
 }
 .card-top {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 10px;
   margin-bottom: 2px;
 }
+
+/*
+ * The fret row has to hold one line at its worst case: a seven-string tuning
+ * with every string at a two-digit fret, on the narrowest card the grid will
+ * make. It used to be one letter-spaced string that simply wrapped, which put a
+ * stray "0" on a second line under even the common six-string shapes.
+ *
+ * It now sizes itself against the card. The card publishes --fret-budget, the
+ * width this particular row needs in ems (see fretBudget in VoicingCard), and
+ * the type shrinks to whatever is left of the card's own width after the play
+ * button and the gap. Capped at the 13px it always was, which is what every
+ * card wide enough to afford it still gets — the shrinking is reserved for the
+ * shapes high up the neck that actually need it.
+ */
 .frets {
-  font-size: 13px;
-  letter-spacing: 0.13em;
+  display: flex;
+  justify-content: space-between;
+  flex: 1 1 auto;
+  min-width: 0;
+  white-space: nowrap;
   color: var(--ink-soft);
+  font-size: min(13px, calc((100cqi - 42px) / var(--fret-budget, 7)));
 }
 .play {
   border: 1px solid var(--line);
