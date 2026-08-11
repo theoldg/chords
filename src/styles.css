@@ -1022,7 +1022,8 @@ code {
   font-size: 17px;
   line-height: 1.6;
   letter-spacing: 0.04em;
-  resize: vertical;
+  overflow: hidden;
+  min-height: calc(1.6em * 2 + 22px);
 }
 .text-area:focus {
   outline: 2px solid var(--accent);

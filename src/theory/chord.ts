@@ -202,15 +202,29 @@ const TRIAD_TONES: Record<Triad, { degree: number; alter: number }[]> = {
   five: [{ degree: 5, alter: 0 }],
 };
 
+/**
+ * A "stacked" extension (9/11/13 folded into the chord name, e.g. G9) implies
+ * a dominant 7th by convention even if the 7th control was never touched —
+ * that's what separates it from "add", which bolts the extension onto a
+ * plain triad with no 7th at all. Without this, picking "stacked" and "add"
+ * produced the exact same tones whenever the 7th was left at "none".
+ */
+function effectiveSeventh(state: ChordBuilderState): Seventh {
+  if (state.seventh !== "none") return state.seventh;
+  const stacked = state.ext9 === "on" || state.ext11 === "on" || state.ext13 === "on";
+  return stacked ? "b7" : "none";
+}
+
 export function buildChord(state: ChordBuilderState): ChordSpec {
   const root = state.root;
   const specs: { degree: number; alter: number }[] = [{ degree: 1, alter: 0 }];
 
   for (const t of TRIAD_TONES[state.triad]) specs.push({ ...t });
 
-  if (state.seventh === "6") specs.push({ degree: 6, alter: 0 });
-  else if (state.seventh === "b7") specs.push({ degree: 7, alter: -1 });
-  else if (state.seventh === "maj7") specs.push({ degree: 7, alter: 0 });
+  const seventh = effectiveSeventh(state);
+  if (seventh === "6") specs.push({ degree: 6, alter: 0 });
+  else if (seventh === "b7") specs.push({ degree: 7, alter: -1 });
+  else if (seventh === "maj7") specs.push({ degree: 7, alter: 0 });
 
   // A diminished triad with a b7 spelled as bb7 is the fully-diminished chord.
   if (state.triad === "dim" && state.seventh === "6") {

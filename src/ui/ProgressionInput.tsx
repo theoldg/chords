@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { parseProgression, type ProgressionEntry } from "../theory/chord";
 
 interface Props {
@@ -31,6 +31,17 @@ export function ProgressionInput({ value, onChange }: Props) {
    */
   const [caret, setCaret] = useState<number | null>(null);
   const backdrop = useRef<HTMLDivElement>(null);
+  const textarea = useRef<HTMLTextAreaElement>(null);
+
+  // Grows the field to fit its content instead of scrolling internally: reset
+  // to nothing first so it can shrink back down when a line is deleted, not
+  // just grow.
+  useLayoutEffect(() => {
+    const el = textarea.current;
+    if (!el) return;
+    el.style.height = "0px";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [value]);
 
   const flagged = useMemo(() => {
     const underCaret = (e: ProgressionEntry) =>
@@ -76,6 +87,7 @@ export function ProgressionInput({ value, onChange }: Props) {
 
         <textarea
           className="text-area mono"
+          ref={textarea}
           value={value}
           onChange={(e) => {
             onChange(e.target.value);

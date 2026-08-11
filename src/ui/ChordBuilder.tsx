@@ -46,6 +46,7 @@ const ALTERATIONS: { value: Alteration; label: string }[] = [
 ];
 
 const PRESETS: { label: string; patch: Partial<ChordBuilderState> }[] = [
+  { label: "", patch: { triad: "maj", seventh: "none", ext9: "off", ext11: "off", ext13: "off", alterations: [] } },
   { label: "maj7", patch: { triad: "maj", seventh: "maj7", ext9: "off", ext11: "off", ext13: "off", alterations: [] } },
   { label: "m7", patch: { triad: "min", seventh: "b7", ext9: "off", ext11: "off", ext13: "off", alterations: [] } },
   { label: "7", patch: { triad: "maj", seventh: "b7", ext9: "off", ext11: "off", ext13: "off", alterations: [] } },
@@ -94,6 +95,23 @@ export function ChordBuilder({ state, onChange, symbol }: Props) {
               onClick={() => set({ root: r })}
             >
               {r}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="block">
+        <div className="block-title">Common shapes</div>
+        <div className="chip-row">
+          {PRESETS.map((p) => (
+            <button
+              key={p.label}
+              type="button"
+              className="chip ghost"
+              onClick={() => set({ ...p.patch, bass: null })}
+            >
+              {state.root}
+              {p.label}
             </button>
           ))}
         </div>
@@ -178,23 +196,6 @@ export function ChordBuilder({ state, onChange, symbol }: Props) {
               onClick={() => toggleAlteration(a.value)}
             >
               {a.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="block">
-        <div className="block-title">Common shapes</div>
-        <div className="chip-row">
-          {PRESETS.map((p) => (
-            <button
-              key={p.label}
-              type="button"
-              className="chip ghost"
-              onClick={() => set({ ...p.patch, bass: null })}
-            >
-              {state.root}
-              {p.label}
             </button>
           ))}
         </div>
