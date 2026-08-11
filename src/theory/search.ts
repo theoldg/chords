@@ -197,12 +197,31 @@ function evaluate(
   score += omissionCost;
   score += hand.fingers * 1.2;
   if (hand.barre) score += 0.4;
-  score += Math.max(0, hand.span - 1) * 1.5;
+
+  /*
+   * Raw fret span is the wrong thing to charge once there is a barre. The
+   * barre finger is an anchor: it holds its fret flat without stretching, and
+   * the remaining fingers work forward from it, so a barre plus fingers a
+   * couple of frets up is not a stretch at all — it is every E- and A-shape
+   * barre chord there is. Charging span-1 taxed Am7 as 5-7-5-5-5-5 three
+   * points for a shape whose only reach is one finger, one fret past the
+   * barre, and did the same to every barre form in the library. Span 3 is in
+   * fact the *modal* barre shape in the curated library (699 of 1,218).
+   *
+   * One fret of relief, not two: zeroing it outright let the A-shape C barre
+   * x-3-5-5-5-3 undercut open C, and no model that says that is calibrated.
+   */
+  const stretch = hand.barre ? Math.max(0, hand.span - 2) : Math.max(0, hand.span - 1);
+  score += stretch * 1.5;
 
   score -= notes.filter((n) => n.fret === 0).length * 0.6;
 
   const awkward = handAwkwardness(frets, fretted);
   score += awkward.straddle;
+  if (awkward.arched > 0) {
+    score += awkward.arched * 4;
+    flags.push({ kind: "warn", text: "A flat finger must clear a ringing open string" });
+  }
 
   // Prefer shapes near the nut. Cheap to reach, easier to hold, and they get
   // to use open strings. Scaled so a shape twelve frets up pays about four
@@ -344,8 +363,8 @@ function evaluate(
 function handAwkwardness(
   frets: (number | null)[],
   fretted: VoicingNote[],
-): { straddle: number } {
-  if (fretted.length < 2) return { straddle: 0 };
+): { straddle: number; arched: number } {
+  if (fretted.length < 2) return { straddle: 0, arched: 0 };
 
   const byFret = new Map<number, number[]>();
   for (const n of fretted) {
@@ -367,6 +386,8 @@ function handAwkwardness(
   };
 
   const topFret = ordered[ordered.length - 1];
+  const bottomFret = ordered[0];
+  let arched = 0;
 
   for (let a = 0; a < ordered.length; a++) {
     const fretA = ordered[a];
@@ -383,6 +404,17 @@ function handAwkwardness(
       if (trapped === 0) continue;
       // Straddling from below is free when it is genuinely a barre.
       if (fretA < fretB && barrable(fretA, from, to)) continue;
+      /*
+       * And nothing is trapped when what sits between is the barre itself.
+       * D7 as x-5-7-5-7-5 reads as the fret-7 pair straddling a fret-5 finger
+       * on the G string, but that G string is under the index barre — the two
+       * fingers at 7 have a flat bar beneath them, not a finger to reach
+       * around. This is the ordinary A7 shape and must cost nothing.
+       */
+      if (fretA > fretB && fretB === bottomFret) {
+        const stringsB = byFret.get(fretB) as number[];
+        if (barrable(fretB, Math.min(...stringsB), Math.max(...stringsB))) continue;
+      }
       straddle += trapped * Math.abs(fretB - fretA) * 0.55;
     }
 
@@ -395,12 +427,44 @@ function handAwkwardness(
      * the same time: x-3-1-0-1-x pins fret 1 across the D and B strings while
      * the ring finger reaches to fret 3.
      */
-    if (fretA !== topFret && !barrable(fretA, from, to)) {
-      straddle += 0.5 + 0.3 * (to - from - 1);
+    if (!barrable(fretA, from, to)) {
+      if (fretA !== topFret) straddle += 0.5 + 0.3 * (to - from - 1);
+
+      /*
+       * An open string inside a same-fret split is only a problem when the
+       * finger beside it is lying *flat*. Two fingertips either side of a
+       * ringing string is routine — A7 as x-0-2-0-2-0, Cadd9 as x-3-2-0-3-0,
+       * and 7.4% of the curated library — because a fingertip stands on its
+       * own string and nothing overhangs. A finger covering two or more
+       * strings at once cannot do that: it is already lying across the neck,
+       * so the string next to it is under the flat of the finger, not beside
+       * it. Am7 as 5-0-5-5-5-5 asks for exactly that — a finger flat across
+       * D-G-B-e at fret 5, a second finger on the low E at the same fret, and
+       * the open A threaded between them.
+       *
+       * That combination appears 0 times in 2,069 curated fingerings, which is
+       * why it is priced to lose to any honest alternative. The old topFret
+       * exemption let it through free: a one-fret shape is trivially its own
+       * top fret.
+       */
+      const runs: number[][] = [];
+      for (const s of [...stringsA].sort((x, y) => x - y)) {
+        const last = runs[runs.length - 1];
+        if (last && s === last[last.length - 1] + 1) last.push(s);
+        else runs.push([s]);
+      }
+      for (let r = 1; r < runs.length; r++) {
+        const left = runs[r - 1];
+        const right = runs[r];
+        if (left.length < 2 && right.length < 2) continue;
+        for (let s = left[left.length - 1] + 1; s < right[0]; s++) {
+          if (frets[s] === 0) arched++;
+        }
+      }
     }
   }
 
-  return { straddle };
+  return { straddle, arched };
 }
 
 /**
