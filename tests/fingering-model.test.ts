@@ -104,7 +104,7 @@ describe("A-shape barres rank well", () => {
       ["B", "x-2-4-4-4-2", 3],
       ["Bb", "x-1-3-3-3-1", 3],
       ["F", "1-3-3-2-1-1", 3],
-      ["Cm", "x-3-5-5-4-3", 10],
+      ["Cm", "x-3-5-5-4-3", 1],
     ] as const) {
       const { rank } = rankOf(symbol, id);
       expect(rank, `${symbol} ${id} ranked #${rank}`).toBeGreaterThan(0);

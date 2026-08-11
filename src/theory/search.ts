@@ -196,12 +196,12 @@ function evaluate(
 
   score += omissionCost;
   score += hand.fingers * 1.2;
-  if (hand.barre) score += 1.4;
+  if (hand.barre) score += 0.4;
   score += Math.max(0, hand.span - 1) * 1.5;
 
   score -= notes.filter((n) => n.fret === 0).length * 0.6;
 
-  const awkward = handAwkwardness(fretted);
+  const awkward = handAwkwardness(frets, fretted);
   score += awkward.straddle;
   if (awkward.straddle >= 1.5) {
     flags.push({ kind: "warn", text: "Fingers have to straddle" });
@@ -211,7 +211,7 @@ function evaluate(
   // to use open strings. Scaled so a shape twelve frets up pays about four
   // points — enough to lose to its open-position equivalent, not so much that
   // it outweighs dropping a required-ish tone.
-  score += hand.lowestFret * 0.55;
+  score += hand.lowestFret * 0.65;
 
   // Prefer voicings that ring out across the whole instrument, but price each
   // silent string by how hard it actually is to silence (see above).
@@ -319,12 +319,19 @@ function evaluate(
  *
  * Cost is innerFingers x fretGap, which puts x31013 at four times open G.
  *
- * A *lower* fret group straddling a higher one is just a barre with fingers
- * inside it (every A-shape), so it costs nothing — only the higher-over-lower
- * direction is penalised. Interior open strings cost nothing either: nothing
- * has to be fretted there.
+ * A *lower* fret group straddling a higher one is usually just a barre with
+ * fingers inside it (every A-shape), so it is free — but only when it really
+ * can be barred. In x-3-5-0-4-3 the open G string breaks the fret-3 barre, so
+ * those are two independent fingers four strings apart with fingers at frets 5
+ * and 4 trapped between them: the same claw, and it is charged the same.
+ *
+ * Interior open strings cost nothing in themselves — nothing has to be fretted
+ * there, and open C rings one happily.
  */
-function handAwkwardness(fretted: VoicingNote[]): { straddle: number } {
+function handAwkwardness(
+  frets: (number | null)[],
+  fretted: VoicingNote[],
+): { straddle: number } {
   if (fretted.length < 2) return { straddle: 0 };
 
   const byFret = new Map<number, number[]>();
@@ -337,17 +344,46 @@ function handAwkwardness(fretted: VoicingNote[]): { straddle: number } {
   const ordered = [...byFret.keys()].sort((a, b) => a - b);
   let straddle = 0;
 
-  for (let hi = 0; hi < ordered.length; hi++) {
-    const upperFret = ordered[hi];
-    const upperStrings = byFret.get(upperFret) as number[];
-    const from = Math.min(...upperStrings);
-    const to = Math.max(...upperStrings);
+  /** One finger can lie across this group only if everything inside is fretted at least as high. */
+  const barrable = (fret: number, from: number, to: number) => {
+    for (let s = from + 1; s < to; s++) {
+      const f = frets[s];
+      if (f === null || f < fret) return false;
+    }
+    return true;
+  };
+
+  const topFret = ordered[ordered.length - 1];
+
+  for (let a = 0; a < ordered.length; a++) {
+    const fretA = ordered[a];
+    const stringsA = byFret.get(fretA) as number[];
+    const from = Math.min(...stringsA);
+    const to = Math.max(...stringsA);
     if (from === to) continue; // a single finger cannot straddle anything
 
-    for (let lo = 0; lo < hi; lo++) {
-      const lowerFret = ordered[lo];
-      const trapped = (byFret.get(lowerFret) as number[]).filter((s) => s > from && s < to).length;
-      if (trapped > 0) straddle += trapped * (upperFret - lowerFret) * 0.55;
+    for (let b = 0; b < ordered.length; b++) {
+      if (a === b) continue;
+      const fretB = ordered[b];
+      // A group only straddles the fingers sitting between its outermost two.
+      const trapped = (byFret.get(fretB) as number[]).filter((s) => s > from && s < to).length;
+      if (trapped === 0) continue;
+      // Straddling from below is free when it is genuinely a barre.
+      if (fretA < fretB && barrable(fretA, from, to)) continue;
+      straddle += trapped * Math.abs(fretB - fretA) * 0.55;
+    }
+
+    /*
+     * A split that cannot be barred means two fingers pinned to one fret with a
+     * gap between them. That is free when the split is the *highest* fret —
+     * every other finger is behind it and the hand reaches around, which is all
+     * open G (320003) asks for. It costs when other fingers sit further up the
+     * neck, because now the hand has to hold the spread and reach forward at
+     * the same time: x-3-1-0-1-x pins fret 1 across the D and B strings while
+     * the ring finger reaches to fret 3.
+     */
+    if (fretA !== topFret && !barrable(fretA, from, to)) {
+      straddle += 0.5 + 0.3 * (to - from - 1);
     }
   }
 
