@@ -2,7 +2,6 @@ import { useMemo, useState } from "react";
 import {
   DEFAULT_BUILDER,
   buildChord,
-  parseChordSymbol,
   type ChordBuilderState,
   type ChordSpec,
 } from "../theory/chord";
@@ -14,25 +13,22 @@ import { ChordBuilder } from "./ChordBuilder";
 import { ChordDiagram } from "./ChordDiagram";
 import { ProgressionView } from "./ProgressionView";
 
-/** The three ways of naming what you want: build it, type it, type several. */
-type Mode = "blocks" | "text" | "progression";
+/** The two ways of naming what you want: type it (one or several), or build it. */
+type Mode = "progression" | "blocks";
 
 export function App() {
   const [tuningText, setTuningText] = useState("EADGBE");
   const [progressionText, setProgressionText] = useState("Am7 D7 Gmaj7 Cmaj7");
-  const [mode, setMode] = useState<Mode>("blocks");
+  const [mode, setMode] = useState<Mode>("progression");
   const [builder, setBuilder] = useState<ChordBuilderState>(DEFAULT_BUILDER);
-  const [chordText, setChordText] = useState("Am");
   const [opts, setOpts] = useState<SearchOptions>(DEFAULT_SEARCH_OPTIONS);
   const [showDegrees, setShowDegrees] = useState(true);
 
   const { tuning, error: tuningError } = useMemo(() => parseTuning(tuningText), [tuningText]);
 
   const builtSpec = useMemo(() => buildChord(builder), [builder]);
-  const parsed = useMemo(() => parseChordSymbol(chordText), [chordText]);
 
-  const spec: ChordSpec | null = mode === "blocks" ? builtSpec : mode === "text" ? parsed.spec : null;
-  const chordError = mode === "text" ? parsed.error : null;
+  const spec: ChordSpec | null = mode === "blocks" ? builtSpec : null;
 
   const result = useMemo(() => {
     if (!spec || !tuning) return null;
@@ -182,51 +178,20 @@ export function App() {
           <div className="seg">
             <button
               type="button"
-              className={`seg-btn ${mode === "blocks" ? "on" : ""}`}
-              onClick={() => setMode("blocks")}
-            >
-              Build
-            </button>
-            <button
-              type="button"
-              className={`seg-btn ${mode === "text" ? "on" : ""}`}
-              onClick={() => setMode("text")}
+              className={`seg-btn ${mode === "progression" ? "on" : ""}`}
+              onClick={() => setMode("progression")}
             >
               Type
             </button>
             <button
               type="button"
-              className={`seg-btn ${mode === "progression" ? "on" : ""}`}
-              onClick={() => setMode("progression")}
+              className={`seg-btn ${mode === "blocks" ? "on" : ""}`}
+              onClick={() => setMode("blocks")}
             >
-              Multiple
+              Build
             </button>
           </div>
         </div>
-
-        {mode === "blocks" && (
-          <ChordBuilder state={builder} onChange={setBuilder} symbol={builtSpec.symbol} />
-        )}
-
-        {mode === "text" && (
-          <div className="text-mode">
-            <input
-              className={`text-input big mono ${chordError ? "bad" : ""}`}
-              value={chordText}
-              onChange={(e) => setChordText(e.target.value)}
-              spellCheck={false}
-              aria-label="Chord symbol"
-            />
-            {chordError ? (
-              <p className="error">{chordError}</p>
-            ) : (
-              <p className="hint">
-                Understands <code>Gm(add11)</code>, <code>Cmaj7#11</code>, <code>E7#9</code>,{" "}
-                <code>C6/9</code>, <code>F7alt</code>, <code>Am7/E</code>, <code>Cno5</code>.
-              </p>
-            )}
-          </div>
-        )}
 
         {mode === "progression" && (
           <>
@@ -241,9 +206,15 @@ export function App() {
             />
             <p className="hint">
               One row of fingerings per chord. Separate with spaces, commas, bar lines or new lines —
-              paste a chart straight in. Each row scrolls sideways.
+              paste a chart straight in. Each row scrolls sideways. Understands{" "}
+              <code>Gm(add11)</code>, <code>Cmaj7#11</code>, <code>E7#9</code>, <code>C6/9</code>,{" "}
+              <code>F7alt</code>, <code>Am7/E</code>, <code>Cno5</code>.
             </p>
           </>
+        )}
+
+        {mode === "blocks" && (
+          <ChordBuilder state={builder} onChange={setBuilder} symbol={builtSpec.symbol} />
         )}
 
         {spec && (
