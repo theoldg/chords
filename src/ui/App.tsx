@@ -1,8 +1,9 @@
 import { useMemo } from "react";
 import { DEFAULT_BUILDER, buildChord, type ChordSpec } from "../theory/chord";
 import { DEFAULT_SEARCH_OPTIONS, findVoicings, type SearchOptions } from "../theory/search";
-import { TUNING_PRESETS, parseTuning } from "../theory/tuning";
+import { parseTuning } from "../theory/tuning";
 import { ChordBuilder } from "./ChordBuilder";
+import { favouriteKey, starredFirst, useFavourites } from "./favourites";
 import { ProgressionInput } from "./ProgressionInput";
 import { ProgressionView } from "./ProgressionView";
 import {
@@ -37,6 +38,8 @@ export function App() {
   const [showDegrees, setShowDegrees] = usePersistent("showDegrees", true, asBoolean);
   const [settingsOpen, setSettingsOpen] = usePersistent("settingsOpen", false, asBoolean);
   const [theme, setTheme] = usePersistent<Theme>("theme", "system", asOneOf(THEMES));
+
+  const favourites = useFavourites();
 
   useTheme(theme);
 
@@ -86,20 +89,15 @@ export function App() {
           </span>
         </button>
 
-        {/* Mounted whether or not the panel is open, so that opening it folds
-            the rail away in the same motion that unfolds the body rather than
-            cutting it out from under one. It also keeps the rail measurable —
-            it centres the selected preset by measuring its own width, which
-            reads as zero on an element that isn't laid out. */}
-        <div className="rail-fold" inert={settingsOpen}>
-          <div>
-            <TuningRail
-              value={tuningText}
-              onChange={setTuningText}
-              onEdit={() => setSettingsOpen(true)}
-            />
-          </div>
-        </div>
+        {/* The tuning picker lives outside the fold in both states: folded away
+            it is the panel's summary row, open it wraps into the full grid.
+            One set of chips, which travel between the two — see TuningRail. */}
+        <TuningRail
+          value={tuningText}
+          onChange={setTuningText}
+          open={settingsOpen}
+          onEdit={() => setSettingsOpen(true)}
+        />
 
         {/* Two elements, because the animation needs one box to size the row
             and one to be clipped by it; see .settings-body in styles.css.
@@ -107,23 +105,8 @@ export function App() {
             the first frame. */}
         <div id="settings-body" className="settings-body" inert={!settingsOpen}>
           <div>
-            <h3 className="settings-head">Tuning</h3>
-            <div className="chip-row presets">
-              {TUNING_PRESETS.map((p) => (
-                <button
-                  key={p.label}
-                  type="button"
-                  className={`chip ghost ${tuningText.toUpperCase() === p.value.toUpperCase() ? "on" : ""}`}
-                  onClick={() => setTuningText(p.value)}
-                  title={p.note}
-                >
-                  {p.label}
-                  {p.label.toUpperCase() !== p.value.toUpperCase() && (
-                    <span className="chip-hint">{p.value}</span>
-                  )}
-                </button>
-              ))}
-            </div>
+            {/* No "Tuning" heading here: the rail above carries it, and the
+                presets it holds are this section's first half. */}
             <div className="row">
               <input
                 className={`text-input mono ${tuningError ? "bad" : ""}`}
@@ -322,6 +305,7 @@ export function App() {
           tuning={tuning}
           opts={opts}
           showDegrees={showDegrees}
+          favourites={favourites}
         />
       )}
 
@@ -341,16 +325,21 @@ export function App() {
 
             <div className="grid">
               {tuning &&
-                result.voicings.map((v) => (
-                  <VoicingCard
-                    key={v.id}
-                    voicing={v}
-                    tuning={tuning}
-                    rules={result.rules}
-                    showDegrees={showDegrees}
-                    playLabel={`Play ${spec.symbol}`}
-                  />
-                ))}
+                starredFirst(result.voicings, tuning, spec.symbol, favourites).map((v) => {
+                  const key = favouriteKey(tuning, spec.symbol, v.id);
+                  return (
+                    <VoicingCard
+                      key={v.id}
+                      voicing={v}
+                      tuning={tuning}
+                      rules={result.rules}
+                      showDegrees={showDegrees}
+                      playLabel={`Play ${spec.symbol}`}
+                      starred={favourites.has(key)}
+                      onToggleStar={() => favourites.toggle(key)}
+                    />
+                  );
+                })}
             </div>
           </section>
         </>

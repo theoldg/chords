@@ -1,9 +1,10 @@
-import type { CSSProperties } from "react";
+import { useRef, type CSSProperties } from "react";
 import type { ToneRule } from "../theory/rules";
 import type { Voicing } from "../theory/search";
 import type { Tuning } from "../theory/tuning";
 import { strum } from "../audio/pluck";
 import { ChordDiagram } from "./ChordDiagram";
+import { animateReorder } from "./reorder";
 
 interface Props {
   voicing: Voicing;
@@ -13,6 +14,9 @@ interface Props {
   showDegrees: boolean;
   /** What the play button announces, e.g. "Play Am7". */
   playLabel: string;
+  /** Whether this shape is starred, and how to flip it. */
+  starred: boolean;
+  onToggleStar: () => void;
   className?: string;
   role?: string;
 }
@@ -55,11 +59,17 @@ export function VoicingCard({
   rules,
   showDegrees,
   playLabel,
+  starred,
+  onToggleStar,
   className,
   role,
 }: Props) {
+  const cardRef = useRef<HTMLElement>(null);
+
+  const classes = ["card", starred ? "starred" : "", className ?? ""].filter(Boolean).join(" ");
+
   return (
-    <article className={className ? `card ${className}` : "card"} role={role}>
+    <article ref={cardRef} className={classes} role={role}>
       {/*
         One cell per string rather than one joined string, and a budget of how
         much room this particular row needs, so the stylesheet can size it to
@@ -83,6 +93,28 @@ export function VoicingCard({
       <ChordDiagram voicing={voicing} tuning={tuning} showDegrees={showDegrees} />
 
       <div className="card-foot">
+        {/* Bottom-left corner, opposite the play button: starring a shape only
+            promotes it to the front of this same list next time, so it belongs
+            beside the shape rather than anywhere that implies a collection.
+
+            The click re-sorts the list this card is in, so the move is measured
+            here — before the state change — and played out afterwards; see
+            ./reorder.ts. */}
+        <button
+          type="button"
+          className={`star ${starred ? "on" : ""}`}
+          aria-pressed={starred}
+          onClick={() => {
+            // Follow the card up the list, but not back down it.
+            animateReorder(cardRef.current, !starred);
+            onToggleStar();
+          }}
+          title={starred ? "Starred — shown first next time" : "Show this shape first next time"}
+          aria-label={starred ? "Remove star" : "Star this shape"}
+        >
+          {starred ? "★" : "☆"}
+        </button>
+
         <div className="badges">
           {voicing.bassTone && voicing.bassTone.role !== "root" && (
             <span

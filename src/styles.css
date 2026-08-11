@@ -57,6 +57,11 @@
 
 * {
   box-sizing: border-box;
+  /* Safari paints a translucent blue block over whatever you tap, including the
+     text inside it, which lands a beat after the press and reads as a
+     rendering fault rather than as feedback. Every control here draws its own
+     pressed state instead — see `.chip:active` and friends. */
+  -webkit-tap-highlight-color: transparent;
 }
 
 body {
@@ -209,71 +214,79 @@ code {
   min-width: 0;
 }
 /*
- * The rail folds by the same mechanism, in the opposite direction: the two
- * swap places over one duration, so the panel's height moves once instead of
- * jumping as the rail leaves and then easing as the body arrives.
+ * The rail doesn't fold: it *is* the tuning picker in both states, a scrolling
+ * row when the panel is shut and a wrapping grid when it is open. The travel
+ * between the two is a FLIP in ui/TuningRail.tsx — the chips are the same
+ * elements, so on a wide screen, where the row already fits, the first line
+ * barely moves and the rest simply wrap out below it. The box's own height is
+ * animated from the component too, under the same `--fold` and `--ease-fold`
+ * as the body's unfold, so the panel's height moves once rather than twice.
  *
  * `overflow: visible clip` rather than `hidden`: the rail bleeds 20px past the
  * panel's padding on both sides on purpose, so that a chip cut off at the edge
  * reads as "there is more". Clipping both axes — which `hidden` would do — cuts
  * that bleed off and takes the edge fade with it. Clipping only the block axis
- * keeps the bleed while still collapsing the row, and still drops the item's
- * automatic minimum height to zero.
+ * keeps the bleed while still holding the chips inside the box's height as it
+ * animates.
  */
 .rail-fold {
-  display: grid;
   /*
-   * Load-bearing, and the reason the rail stopped scrolling when it moved in
-   * here: an unspecified column is an `auto` track, which sizes to max-content
-   * and is *not* clamped to the grid container. The rail's max-content is every
-   * preset chip on one line, so the track grew to that, the rail grew with it,
-   * and a row with nothing overflowing has nothing to scroll — it moved only
-   * the 40px its negative side margins add. Pinning the column to the
-   * container's width hands the overflow back to the rail, where the scrolling
-   * lives.
+   * A real block formatting context, and load-bearing for the animation rather
+   * than for the layout. With the height left to `auto` the rail's bottom
+   * margin collapses out through this box and lands on it instead; with the
+   * height pinned — which is exactly what the fold animation does — it cannot,
+   * and stays inside. So the box occupied twelve pixels less than its resting
+   * self for the length of the open, and paid the difference back in one frame
+   * the moment the animation released the height: everything below it jumped.
+   * `flow-root` keeps the margin inside in both cases, so what gets measured
+   * is what the box settles at.
    */
-  grid-template-columns: minmax(0, 1fr);
-  grid-template-rows: 1fr;
-  transition: grid-template-rows var(--fold) var(--ease-fold);
-}
-.settings.open .rail-fold {
-  grid-template-rows: 0fr;
-}
-.rail-fold > * {
+  display: flow-root;
   overflow: visible clip;
-  min-height: 0;
-  min-width: 0;
 }
-/* A short lift under the fold, so the rail reads as being drawn up behind the
-   summary line rather than simply squashed. */
-.rail-fold .tuning-rail {
-  transition:
-    opacity 160ms ease 60ms,
-    transform var(--fold) var(--ease-fold);
+/*
+ * Open, the box clips both ways. A chip that was scrolled off the right-hand
+ * end of the row starts its travel outside the panel, and the wrapped rail —
+ * unlike the row it came from — has no scroller of its own to contain it, so
+ * without this it would fly in across the page and give the body a horizontal
+ * scrollbar for the length of the animation. The clip margin is there so a
+ * focus ring on the leftmost chip isn't shaved.
+ */
+.rail-fold.open {
+  overflow: clip;
+  overflow-clip-margin: 4px;
 }
-.settings.open .rail-fold .tuning-rail {
+/* The heading only exists in the open state, and takes no room in the other:
+   `height: 0` rather than `display: none` so its fade has something to run on,
+   and so the height the component measures after the class flips is final.
+   Scoped through the parent so it outranks `.settings-head`'s own margins,
+   which are set further down the sheet. */
+.rail-fold > .rail-head {
+  height: 0;
+  margin: 0;
   opacity: 0;
-  transform: translateY(-8px);
-  transition:
-    opacity 140ms ease,
-    transform var(--fold) var(--ease-fold);
+  overflow: hidden;
+  transition: opacity 120ms ease;
+}
+.rail-fold.open > .rail-head {
+  height: auto;
+  margin: 16px 0 10px;
+  opacity: 1;
+  transition: opacity 200ms ease 60ms;
 }
 
 /* Someone who has asked the OS for less motion gets the same states, reached
-   without travel. */
+   without travel; the component skips its FLIP under the same query. */
 @media (prefers-reduced-motion: reduce) {
   :root {
     --fold: 1ms;
   }
   .settings-body,
   .settings.open .settings-body,
-  .rail-fold .tuning-rail,
-  .settings.open .rail-fold .tuning-rail {
+  .rail-fold > .rail-head,
+  .rail-fold.open > .rail-head {
     transition-duration: 1ms;
     transition-delay: 0s;
-  }
-  .settings.open .rail-fold .tuning-rail {
-    transform: none;
   }
 }
 .settings-summary {
@@ -290,12 +303,27 @@ code {
   color: inherit;
   font: inherit;
   text-align: left;
+  /* A summary line is a target, not a passage: without this a tap that lands
+     slightly long selects "Settings" and leaves it highlighted. */
+  -webkit-user-select: none;
+  user-select: none;
+}
+/* Pressed feedback, in place of the browser's tap flash: the label and the
+   marker come up to full ink for as long as the press lasts. */
+.settings-summary:active .settings-title,
+.settings-summary:active::before {
+  color: var(--ink-soft);
+}
+.settings-title {
+  transition: color 0.12s ease;
 }
 .settings-summary::before {
   content: "›";
   color: var(--ink-faint);
   transform: rotate(0deg);
-  transition: transform 0.15s;
+  transition:
+    transform 0.15s,
+    color 0.12s ease;
   font-size: 15px;
   line-height: 1;
 }
@@ -314,10 +342,15 @@ code {
   gap: 7px;
   overflow-x: auto;
   overflow-y: hidden;
-  margin: 11px -20px -12px;
-  padding: 2px 20px 12px;
+  margin: 11px -20px 0;
+  padding: 2px 20px 3px;
   scroll-snap-type: x proximity;
   overscroll-behavior-x: contain;
+  /* The bottom padding used to be 12px, cancelled by a -12px margin so that it
+     fell inside the panel's own padding. It doesn't survive being measured: a
+     negative margin is dropped from the box's height in some of the states the
+     fold animates through and kept in others. The scroller doesn't need the
+     room — nothing overflows it vertically — so it no longer asks for it. */
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
   -webkit-mask-image: linear-gradient(to right, transparent 0, #000 20px, #000 calc(100% - 26px), transparent 100%);
@@ -325,6 +358,17 @@ code {
 }
 .tuning-rail::-webkit-scrollbar {
   display: none;
+}
+/* Open, the same row wraps: no overflow to scroll, so no bleed and no edge
+   fade to explain it, and the negative margins that bought the bleed go back. */
+.tuning-rail.wrapped {
+  flex-wrap: wrap;
+  overflow: visible;
+  margin: 0 0 16px;
+  padding: 0;
+  scroll-snap-type: none;
+  -webkit-mask-image: none;
+  mask-image: none;
 }
 .rail-chip {
   flex: 0 0 auto;
@@ -448,6 +492,15 @@ code {
 }
 .chip:hover {
   border-color: var(--ink-faint);
+}
+/* The pressed state a touch device gets in place of hover. */
+.chip:active {
+  border-color: var(--ink-faint);
+  background: var(--accent-soft);
+}
+.chip.on:active {
+  filter: brightness(0.94);
+  background: var(--accent);
 }
 /* Ghost comes first so that `on` still wins the background on a chip wearing
    both — otherwise the selected preset is white text on a transparent chip,
@@ -718,17 +771,66 @@ code {
   /* So the fret row can size itself against the card it sits in. */
   container-type: inline-size;
 }
+
 /*
- * Badges to the left, play in the bottom-right corner. The button used to sit
- * beside the fret row up top, where it stole width from the numbers and pushed
- * them off the strings they name; down here it has a corner to itself and the
- * row grows downwards when a card carries several badges.
+ * The star, in the card's bottom-left corner, opposite the play button. The two
+ * things you can do to a shape — hear it, keep it — sit at the two ends of the
+ * same row, with what the shape *is* between them.
+ *
+ * Faint until you hover the card or it is starred: it marks the one shape in
+ * ten you want back, and a grid of twenty solid stars would read as decoration
+ * on every card at once. The hit area is larger than the glyph so it stays a
+ * thumb-sized target on a phone.
+ */
+.star {
+  flex: 0 0 auto;
+  width: 27px;
+  height: 27px;
+  border: 0;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+  line-height: 1;
+  font-size: 17px;
+  color: var(--ink-soft);
+  opacity: 0.35;
+  transition: opacity 0.15s ease, color 0.15s ease;
+}
+.card:hover .star,
+.star:focus-visible {
+  opacity: 0.8;
+}
+.star.on,
+.card:hover .star.on {
+  color: var(--accent);
+  opacity: 1;
+}
+.star:hover {
+  opacity: 1;
+}
+/*
+ * A starred card is outlined in the accent. The star alone was too quiet to
+ * answer "which of these did I keep?" from across the grid, and a card at the
+ * front of a list looks no different from a card that is merely ranked first —
+ * the border is what says the order was your doing. Drawn as an inset ring on
+ * top of the existing border rather than by thickening it, so nothing reflows.
+ */
+.card.starred {
+  border-color: var(--accent);
+  box-shadow: var(--shadow), inset 0 0 0 1px var(--accent);
+}
+
+/*
+ * The two controls take the corners — star at bottom-left, play at
+ * bottom-right — and the badges sit centred between them. The play button used
+ * to sit beside the fret row up top, where it stole width from the numbers and
+ * pushed them off the strings they name; down here it has a corner to itself
+ * and the row grows downwards when a card carries several badges.
  */
 .card-foot {
   display: flex;
   align-items: flex-end;
-  justify-content: space-between;
-  gap: 8px;
+  gap: 6px;
   margin-top: auto;
 }
 
@@ -854,10 +956,14 @@ code {
   opacity: 0.5;
 }
 
+/* Centred, and taking whatever the two corner buttons leave: the badges are a
+   caption for the shape above them, not a column aligned to one edge. */
 .badges {
   display: flex;
+  flex: 1;
   flex-wrap: wrap;
   align-content: flex-end;
+  justify-content: center;
   gap: 4px;
   margin: 8px 0 2px;
   min-width: 0;
