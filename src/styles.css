@@ -173,6 +173,15 @@ code {
 }
 .settings-body {
   display: grid;
+  /*
+   * The column is spelled out, and `minmax(0, 1fr)` rather than the `auto` an
+   * unspecified column would get: an auto track sizes to its contents'
+   * max-content and is not clamped to the grid container, so a row of chips
+   * that is meant to wrap instead lays itself out in one line and drags the
+   * track out past the panel. `0` as the minimum is what stops the same thing
+   * happening through the track's automatic minimum size.
+   */
+  grid-template-columns: minmax(0, 1fr);
   grid-template-rows: 0fr;
   opacity: 0;
   /* Kept out of the accessibility tree and out of tab order while folded away;
@@ -197,6 +206,7 @@ code {
 .settings-body > * {
   overflow: hidden;
   min-height: 0;
+  min-width: 0;
 }
 /*
  * The rail folds by the same mechanism, in the opposite direction: the two
@@ -212,6 +222,17 @@ code {
  */
 .rail-fold {
   display: grid;
+  /*
+   * Load-bearing, and the reason the rail stopped scrolling when it moved in
+   * here: an unspecified column is an `auto` track, which sizes to max-content
+   * and is *not* clamped to the grid container. The rail's max-content is every
+   * preset chip on one line, so the track grew to that, the rail grew with it,
+   * and a row with nothing overflowing has nothing to scroll — it moved only
+   * the 40px its negative side margins add. Pinning the column to the
+   * container's width hands the overflow back to the rail, where the scrolling
+   * lives.
+   */
+  grid-template-columns: minmax(0, 1fr);
   grid-template-rows: 1fr;
   transition: grid-template-rows var(--fold) var(--ease-fold);
 }
@@ -221,6 +242,7 @@ code {
 .rail-fold > * {
   overflow: visible clip;
   min-height: 0;
+  min-width: 0;
 }
 /* A short lift under the fold, so the rail reads as being drawn up behind the
    summary line rather than simply squashed. */
