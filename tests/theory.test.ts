@@ -224,10 +224,16 @@ describe("voicing search", () => {
     // engine finds it at all and reports the omission correctly. Mute variants
     // stay expanded because display prefers the same grip with the low E left
     // ringing, and this test is about the classic muted-low form.
+    //
+    // The classic shape silences the high E, which is a skipped string like any
+    // other now, so it needs that permission — strummed straight through, the
+    // engine has no business offering a shape whose top string has to be killed
+    // by hand.
     const res = search("E7#9", "EADGBE", {
       minSoundingStrings: 4,
       maxResults: 100000,
       collapseMuteVariants: false,
+      allowInnerMutes: true,
     });
     const hendrix = res.voicings.find((v) => v.id === "x-7-6-7-8-x");
     expect(hendrix).toBeTruthy();

@@ -3,6 +3,18 @@ import type { Tuning } from "../theory/tuning";
 
 const FRETS_SHOWN = 5;
 
+/**
+ * The inlay dots a guitar has on its fingerboard, repeating every octave, so a
+ * windowed diagram reads against the same landmarks as the neck in your hands.
+ * Drawn between the strings rather than on them so they never read as notes.
+ */
+function inlay(fret: number): 0 | 1 | 2 {
+  if (fret <= 0) return 0;
+  const within = fret % 12;
+  if (within === 0) return 2;
+  return within === 5 || within === 7 || within === 9 ? 1 : 0;
+}
+
 interface Props {
   voicing: Voicing;
   tuning: Tuning;
@@ -82,6 +94,22 @@ export function ChordDiagram({ voicing, tuning, showDegrees }: Props) {
           className="fret"
         />
       ))}
+
+      {/* Fingerboard inlays, behind the strings so a dot never competes with a
+          note. Kept faint: they are for orientation, not information. */}
+      {Array.from({ length: FRETS_SHOWN }, (_, i) => startFret + i + 1).map((fret) => {
+        const marks = inlay(fret);
+        if (marks === 0) return null;
+        const mid = left + ((stringCount - 1) * stringGap) / 2;
+        const spread = marks === 2 ? stringGap * 0.7 : 0;
+        return (
+          <g key={`i${fret}`} className="inlay">
+            {(marks === 2 ? [-spread, spread] : [0]).map((dx) => (
+              <circle key={dx} cx={mid + dx} cy={y(fret)} r={3.2} />
+            ))}
+          </g>
+        );
+      })}
 
       {/* Strings */}
       {tuning.strings.map((_, i) => (

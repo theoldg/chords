@@ -295,6 +295,10 @@ code {
   display: inline-flex;
   flex-direction: column;
   align-items: center;
+  /* Chips in a row stretch to the tallest one, which is a preset carrying its
+     tuning underneath. Centring keeps a bare label (DADGAD, which is its own
+     tuning) on the middle line rather than hanging from the top. */
+  justify-content: center;
   gap: 1px;
   background: var(--bg);
   border: 1px solid var(--line);
@@ -491,10 +495,21 @@ code {
 
 /* --- options --- */
 
+/* Two grids, one per kind of control, so three sliders hold one row and three
+   tick boxes hold the next instead of the six flowing 4 + 2. */
 .opts {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 14px 22px;
+}
+.opts.checks {
+  margin-top: 14px;
+}
+/* Between phone and desktop there is room for two but not three. */
+@media (max-width: 860px) {
+  .opts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 .opt {
   display: flex;
@@ -567,12 +582,18 @@ code {
   /* So the fret row can size itself against the card it sits in. */
   container-type: inline-size;
 }
-.card-top {
+/*
+ * Badges to the left, play in the bottom-right corner. The button used to sit
+ * beside the fret row up top, where it stole width from the numbers and pushed
+ * them off the strings they name; down here it has a corner to itself and the
+ * row grows downwards when a card carries several badges.
+ */
+.card-foot {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   justify-content: space-between;
-  gap: 10px;
-  margin-bottom: 2px;
+  gap: 8px;
+  margin-top: auto;
 }
 
 /*
@@ -583,21 +604,22 @@ code {
  *
  * It now sizes itself against the card. The card publishes --fret-budget, the
  * width this particular row needs in ems (see fretBudget in VoicingCard), and
- * the type shrinks to whatever is left of the card's own width after the play
- * button and the gap. Capped at the 13px it always was, which is what every
- * card wide enough to afford it still gets — the shrinking is reserved for the
- * shapes high up the neck that actually need it.
+ * the type shrinks to whatever is left of the card's own width. Capped at the
+ * 13px it always was, which is what every card wide enough to afford it still
+ * gets — the shrinking is reserved for the shapes high up the neck that
+ * actually need it.
  */
 .frets {
   display: flex;
   justify-content: space-between;
-  flex: 1 1 auto;
   min-width: 0;
+  margin-bottom: 2px;
   white-space: nowrap;
   color: var(--ink-soft);
-  font-size: min(13px, calc((100cqi - 42px) / var(--fret-budget, 7)));
+  font-size: min(13px, calc(100cqi / var(--fret-budget, 7)));
 }
 .play {
+  flex: 0 0 auto;
   border: 1px solid var(--line);
   background: var(--bg);
   color: var(--ink-soft);
@@ -633,6 +655,18 @@ code {
   .fret,
   .string {
     stroke: #46434c;
+  }
+}
+/* Fingerboard inlays: present enough to count off 5-7-9-12 at a glance, faint
+   enough that a dot is never mistaken for a note. */
+.inlay circle {
+  fill: var(--ink);
+  opacity: 0.13;
+}
+@media (prefers-color-scheme: dark) {
+  .inlay circle {
+    fill: #fff;
+    opacity: 0.3;
   }
 }
 .position-label {
@@ -700,8 +734,10 @@ code {
 .badges {
   display: flex;
   flex-wrap: wrap;
+  align-content: flex-end;
   gap: 4px;
-  margin: 8px 0 6px;
+  margin: 8px 0 2px;
+  min-width: 0;
 }
 .badge {
   font-size: 11px;
@@ -749,6 +785,48 @@ code {
 .text-area:focus {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
+}
+
+/*
+ * Field and backdrop are stacked in the same box, sharing every metric that
+ * decides where a glyph lands. The backdrop only draws the wavy underline: its
+ * own text is transparent, so what you read is the textarea's, drawn on top.
+ */
+.prog-input {
+  position: relative;
+}
+/* Scoped to `.prog-input`, not a bare `.text-backdrop`: the backdrop wears
+   `.text-area` as well — it has to, to share the metrics — so any rule aimed at
+   the field alone outweighs a one-class rule here and drops the backdrop back
+   into the flow, sitting under the field instead of behind it. */
+.prog-input .text-backdrop {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-color: transparent;
+  background: transparent;
+  color: transparent;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  pointer-events: none;
+}
+.prog-input textarea.text-area {
+  position: relative;
+  background: transparent;
+}
+/* Painted behind the backdrop's transparent text, so the field still has its
+   own surface without hiding the marks. */
+.prog-input::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 9px;
+  background: var(--bg);
+}
+.unreadable {
+  text-decoration: underline wavy var(--accent);
+  text-decoration-skip-ink: none;
+  text-underline-offset: 3px;
 }
 
 .prog-row {

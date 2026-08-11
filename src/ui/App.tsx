@@ -3,6 +3,7 @@ import { DEFAULT_BUILDER, buildChord, type ChordSpec } from "../theory/chord";
 import { DEFAULT_SEARCH_OPTIONS, findVoicings, type SearchOptions } from "../theory/search";
 import { TUNING_PRESETS, parseTuning } from "../theory/tuning";
 import { ChordBuilder } from "./ChordBuilder";
+import { ProgressionInput } from "./ProgressionInput";
 import { ProgressionView } from "./ProgressionView";
 import {
   OPTION_LIMITS,
@@ -136,7 +137,14 @@ export function App() {
           )}
 
           <h3 className="settings-head">Constraints</h3>
-          <div className="opts">
+          {/*
+            Sliders and tick boxes are laid out as two grids rather than one, so
+            the three of each keep their own row on a wide screen: a single
+            auto-fitting grid put four items on the first row and two on the
+            second, which read as an arbitrary grouping. Both collapse to one
+            column on a phone.
+          */}
+          <div className="opts sliders">
             <label className="opt">
               <span>
                 Fret stretch <b>{opts.maxSpan}</b>
@@ -173,6 +181,8 @@ export function App() {
                 onChange={(e) => setOpt("minSoundingStrings", Number(e.target.value))}
               />
             </label>
+          </div>
+          <div className="opts checks">
             <label className="opt check">
               <input
                 type="checkbox"
@@ -233,20 +243,9 @@ export function App() {
 
         {mode === "progression" && (
           <>
-            <textarea
-              className="text-area mono"
-              value={progressionText}
-              onChange={(e) => setProgressionText(e.target.value)}
-              rows={2}
-              spellCheck={false}
-              placeholder="Am7  D7  Gmaj7  Cmaj7"
-              aria-label="Chord progression"
-            />
+            <ProgressionInput value={progressionText} onChange={setProgressionText} />
             <p className="hint">
-              One row of fingerings per chord. Separate with spaces, commas, bar lines or new lines —
-              paste a chart straight in. Each row scrolls sideways. Understands{" "}
-              <code>Gm(add11)</code>, <code>Cmaj7#11</code>, <code>E7#9</code>, <code>C6/9</code>,{" "}
-              <code>F7alt</code>, <code>Am7/E</code>, <code>Am/G#</code>, <code>Cno5</code>.
+              Chord symbols separated with spaces, commas, bar lines or new lines.
             </p>
           </>
         )}

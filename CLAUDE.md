@@ -34,7 +34,14 @@ The pipeline, in order:
 
 **Omission rules are hand-encoded, deliberately.** Public chord databases are collections of *shapes*, not reasoning, so they can't say why a shape is legal or what it dropped. `rules.ts` encodes the pedagogy (Levine's guide tones and rootless voicings, Ted Greene on what to drop with four fingers, Berklee low-interval limits) explicitly so that **every omission carries its reason through to the UI**. Preserve that: a new constraint should surface as an `OmissionReason`/`explanation`/`Flag`, not as a silent filter.
 
-**The hand model is calibrated, not guessed.** `computeHand()` and `handAwkwardness()` in `search.ts` are tuned against the 2,069 curated fingerings in `@tombatossals/chords-db`, and `tests/fingering-model.test.ts` checks the model against that library directly. The load-bearing beliefs, each with the counterexample that produced it, are documented in comments there: one finger may cover a contiguous run at the same fret (so A-shape barres cost two fingers, not four); *straddling* rather than reach is what makes a shape hurt; and mute cost depends on where the mute is (low-side 0.4, high-side 2.2, inner 3.0). Do not adjust a score constant without checking `npm test` — the golden tests in `tests/theory.test.ts` assert real-world shapes (open C, the F barre, Hendrix `E7#9` correctly reporting a dropped 5th) and exist precisely to catch tuning drift.
+**The hand model is calibrated, not guessed.** `computeHand()` and `handAwkwardness()` in `search.ts` are tuned against the 2,069 curated fingerings in `@tombatossals/chords-db`, and `tests/fingering-model.test.ts` checks the model against that library directly. The load-bearing beliefs, each with the counterexample that produced it, are documented in comments there:
+
+- One finger may cover a contiguous run at the same fret, so A-shape barres cost two fingers, not four — but laying a finger flat is an *option* (`canLieFlat`), not an obligation. The bar reaches exactly one string past what it presses, and it can lift its tip over that string only if it is at most three strings wide (the library has 52 two-string and 6 three-string overhanging bars, and no four-string ones) and the string isn't open. Otherwise the run costs a finger per string, and past four fingers the shape is rejected. This is why open A is three fingers and `x33332` doesn't exist.
+- *Straddling* rather than reach is what makes a shape hurt, and it costs the square of the fret gap: fingers a fret either side of a bar is the ordinary `x32233`, two frets either side is `442244`, which nobody can hold.
+- Muting below the bass is routine (0.4 a string, and 3.0 for a third one); muting anywhere else — between two sounding strings or above the top one — is the same deliberate act, costs 3.0, and is gated behind `allowInnerMutes`.
+- A note doubled at the identical pitch is worth less than the finger it costs.
+
+Do not adjust a score constant without checking `npm test` — the golden tests in `tests/theory.test.ts` assert real-world shapes (open C, the F barre, Hendrix `E7#9` correctly reporting a dropped 5th) and exist precisely to catch tuning drift.
 
 ### Gotchas
 

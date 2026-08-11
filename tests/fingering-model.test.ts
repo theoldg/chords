@@ -104,7 +104,12 @@ describe("A-shape barres rank well", () => {
       ["B", "x-2-4-4-4-2", 3],
       ["Bb", "x-1-3-3-3-1", 3],
       ["F", "1-3-3-2-1-1", 3],
-      ["Cm", "x-3-5-5-4-3", 1],
+      // The A-shape minor barre costs four fingers, not three: the 5-5 pair sits
+      // one fret above the 4, so the finger covering it has nowhere to lift its
+      // tip clear and has to be two fingers. The curated fingering agrees. That
+      // is enough to put the 8th-fret E-shape barre ahead of it by three
+      // quarters of a point, which is a fair fight rather than a bug.
+      ["Cm", "x-3-5-5-4-3", 2],
     ] as const) {
       const { rank } = rankOf(symbol, id);
       expect(rank, `${symbol} ${id} ranked #${rank}`).toBeGreaterThan(0);
@@ -144,6 +149,81 @@ describe("awkwardness, verified on a real guitar", () => {
     expect(shapes("Am")[0].id).toBe("x-0-2-2-1-0");
     expect(shapes("D")[0].id).toBe("x-x-0-2-3-2");
   });
+
+  /*
+   * The first chords anyone learns are all the same shape argument: several
+   * strings at one fret with an open string just past them. Barring them would
+   * kill the open string, so nobody bars them — they cost a finger a string and
+   * are still the easiest shapes on the instrument. The model used to hand out
+   * the barre anyway and then charge four points for the damage, which buried
+   * open A at rank 251 and open Em below three shapes nobody plays.
+   */
+  it("plays the shapes with an open string past the fingers, and likes them best", () => {
+    for (const [symbol, id, fingers] of [
+      ["A", "x-0-2-2-2-0", 3],
+      ["Em", "0-2-2-0-0-0", 2],
+    ] as const) {
+      const top = shapes(symbol)[0];
+      expect(top.id, symbol).toBe(id);
+      // A finger per string, because the bar would land on the open string
+      // just past it. Nobody bars these and neither does the model.
+      expect(top.fingers, symbol).toBe(fingers);
+      expect(top.flags.filter((f) => f.kind === "warn"), symbol).toEqual([]);
+    }
+  });
+
+  it("finds the obvious open D in DAEGAD", () => {
+    const res = findVoicings(parseChordSymbol("D").spec!, parseTuning("DAEGAD").tuning!, {
+      ...DEFAULT_SEARCH_OPTIONS,
+      maxResults: 5000,
+    });
+    expect(res.voicings[0].id).toBe("0-0-2-2-0-0");
+  });
+
+  const hand = (shape: string) => {
+    const frets = [...shape].map((c) => (c === "x" ? null : Number(c)));
+    const fretted = frets
+      .map((f, i) => ({ stringIndex: i, fret: f ?? 0, midi: 0, tone: null as never }))
+      .filter((n) => (frets[n.stringIndex] ?? 0) > 0);
+    return computeHand(frets, fretted);
+  };
+
+  /*
+   * How wide a bar may be and still lift its tip over the string past it. The
+   * curated library has 52 two-string bars and 6 three-string bars that overhang
+   * a lower-fretted string, and no four-string ones at all: by then the finger
+   * is at full stretch and the tip has nothing left to lift with.
+   */
+  it("won't overhang a string with a bar that has no finger left to spare", () => {
+    // Two strings, one fret below, tip lifted over it: the most common
+    // overhanging bar there is (31 of them in the library).
+    expect(hand("332333")?.fingers).toBe(3);
+    // Three strings, and the whole reason A-shape barres work.
+    expect(hand("x24442")?.fingers).toBe(2);
+    // Four strings at the 3rd fret with the high E at the 2nd: no lift left, so
+    // it is a finger per string and a fifth on the high E.
+    expect(hand("x33332")).toBeNull();
+    // A bar reaches one string past itself and no further, which is what makes
+    // the E-shape minor barre two fingers: the ring bar on the A and D strings
+    // has ended long before the B string, whatever is fretted there.
+    const eShapeMinor = computeHand(
+      [8, 10, 10, 8, 8, 8],
+      [8, 10, 10, 8, 8, 8].map((fret, stringIndex) => ({
+        stringIndex,
+        fret,
+        midi: 0,
+        tone: null as never,
+      })),
+    );
+    expect(eShapeMinor?.fingers).toBe(2);
+  });
+
+  it("uses fingertips either side of a ringing open string", () => {
+    // Four fingertips around an open string are fine — everyone's fingers are
+    // arched. These used to be flagged as physically impossible.
+    expect(hand("220120")?.fingers).toBe(4);
+    expect(hand("011010")?.fingers).toBe(3);
+  });
 });
 
 describe("muting is priced by how hard it is", () => {
@@ -155,6 +235,9 @@ describe("muting is priced by how hard it is", () => {
       // These comparisons are between two shapes that differ only by a mute,
       // which is exactly the pair the search collapses for display.
       collapseMuteVariants: false,
+      // A mute above the highest sounding string is a skipped string, so half
+      // of each pair below exists only with that permission granted.
+      allowInnerMutes: true,
     }).voicings.find((v) => v.id === id);
 
   it("prefers muting the low side to muting the high side", () => {
@@ -165,5 +248,47 @@ describe("muting is priced by how hard it is", () => {
     expect(lowMuted).toBeTruthy();
     expect(highMuted).toBeTruthy();
     expect(lowMuted!.score).toBeLessThan(highMuted!.score);
+  });
+
+  it("won't silence a string above the bass without being asked", () => {
+    // Killing the top string and skipping one in the middle take the same
+    // deliberate technique, so they take the same permission. Dropping the
+    // bottom string or two is the only muting that needs none.
+    const strummed = (symbol: string) =>
+      findVoicings(parseChordSymbol(symbol).spec!, tuning(), {
+        ...DEFAULT_SEARCH_OPTIONS,
+        maxResults: 5000,
+        collapseMuteVariants: false,
+      }).voicings.map((v) => v.id);
+
+    expect(strummed("Am")).not.toContain("x-0-2-2-1-x");
+    expect(strummed("Am")).toContain("x-0-2-2-1-0");
+    expect(find("Am", "x-0-2-2-1-x")).toBeTruthy();
+  });
+
+  it("would rather drop the bottom string than invert the chord", () => {
+    // 0-3-2-0-1-0 is a C/E, which is a different chord under a progression. The
+    // low-side mute that gets the root back underneath costs 0.4; the inversion
+    // has to cost more than that.
+    const rooted = find("C", "x-3-2-0-1-0");
+    const inverted = find("C", "0-3-2-0-1-0");
+    expect(rooted).toBeTruthy();
+    expect(inverted).toBeTruthy();
+    expect(rooted!.score).toBeLessThan(inverted!.score);
+  });
+
+  it("won't stretch for a note the string next door is already sounding", () => {
+    // In DAEGAD the 7th fret of the low D string is the A the open A string is
+    // already playing. Filling the bottom string looks like a free win, and it
+    // used to be one — but the unison adds nothing and costs a finger.
+    const daegad = parseTuning("DAEGAD").tuning!;
+    const res = findVoicings(parseChordSymbol("A").spec!, daegad, {
+      ...DEFAULT_SEARCH_OPTIONS,
+      maxResults: 5000,
+    }).voicings;
+    const doubled = res.findIndex((v) => v.id === "7-0-0-6-0-7");
+    const plain = res.findIndex((v) => v.id === "x-0-0-6-0-7");
+    expect(plain).toBeGreaterThanOrEqual(0);
+    expect(doubled).toBeGreaterThan(plain);
   });
 });

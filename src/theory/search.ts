@@ -8,7 +8,12 @@ export interface SearchOptions extends RuleOptions {
   /** Maximum number of frets the hand spans, ignoring open strings. */
   maxSpan: number;
   minSoundingStrings: number;
-  /** Allow a muted string sandwiched between sounding ones. */
+  /**
+   * Allow a string to be skipped anywhere other than below the bass: between
+   * two sounding strings, or above the highest one. Both need the same
+   * deliberate muting technique, so they are the same permission — dropping
+   * the bottom string or two is what nobody needs permission for.
+   */
   allowInnerMutes: boolean;
   /**
    * Collapse shapes that share their fretted notes and differ only in which
@@ -210,30 +215,27 @@ function evaluate(
   }
 
   /*
-   * Silencing a string is not equally easy everywhere, and treating it as a
-   * flat cost was demoting every A-shape barre. Frequencies in the 2,069
-   * curated shapes of @tombatossals/chords-db:
+   * Silencing a string is not equally easy everywhere. Dropping the bottom of
+   * the instrument is routine — the fretting thumb or the picking hand damps
+   * it, and you simply start the strum lower down — and it accounts for 54.4%
+   * of the muted strings in the 2,069 curated shapes of
+   * @tombatossals/chords-db.
    *
-   *   low-side  (below the lowest sounding string)  54.4%  — routine: the
-   *             fretting thumb or picking hand damps it, and you simply start
-   *             the strum lower down
-   *   high-side (above the highest sounding string) 16.1%  — awkward: nothing
-   *             is naturally resting there
-   *   inner                                         10.5%  — needs deliberate
-   *             technique, so it stays opt-in
+   * Everywhere else it is the same act: nothing is resting on that string, so
+   * you have to put something there on purpose. Whether the silent string sits
+   * between two sounding ones or above the highest one makes no difference to
+   * the hand, so the two are priced the same and gated by the same permission —
+   * which is really the switch between strumming and picking the chord.
    */
   const firstSounding = notes[0].stringIndex;
-  const lastSounding = notes[notes.length - 1].stringIndex;
-  let innerMutes = 0;
+  let skippedMutes = 0;
   let lowSideMutes = 0;
-  let highSideMutes = 0;
   for (let i = 0; i < frets.length; i++) {
     if (frets[i] !== null) continue;
     if (i < firstSounding) lowSideMutes++;
-    else if (i > lastSounding) highSideMutes++;
-    else innerMutes++;
+    else skippedMutes++;
   }
-  if (innerMutes > 0 && !opts.allowInnerMutes) return null;
+  if (skippedMutes > 0 && !opts.allowInnerMutes) return null;
 
   // Required tones present? The added bass doesn't count towards them — its
   // degree can collide with a real one (Am7/G# is a natural 7 under a b7) and
@@ -280,12 +282,18 @@ function evaluate(
 
   score -= notes.filter((n) => n.fret === 0).length * 0.6;
 
-  const awkward = handAwkwardness(frets, fretted);
-  score += awkward.straddle;
-  if (awkward.arched > 0) {
-    score += awkward.arched * 4;
-    flags.push({ kind: "warn", text: "A flat finger must clear a ringing open string" });
-  }
+  score += handAwkwardness(hand.placements);
+
+  /*
+   * A note doubled at the same pitch on two strings adds nothing but a finger.
+   * It is not the same as doubling at the octave, which thickens the chord: two
+   * strings on the identical note just sound like one slightly wider string. In
+   * DAEGAD the search was offering 7-0-0-6-0-7 over x-0-0-6-0-7 — a stretch to
+   * the 7th fret to sound an A that the open A string beside it is already
+   * sounding — because filling the bottom string looked like a free win.
+   */
+  const unisons = notes.length - new Set(notes.map((n) => n.midi)).size;
+  score += unisons * 0.9;
 
   // Prefer shapes near the nut. Cheap to reach, easier to hold, and they get
   // to use open strings. Scaled so a shape twelve frets up pays about four
@@ -293,10 +301,15 @@ function evaluate(
   // it outweighs dropping a required-ish tone.
   score += hand.lowestFret * 0.65;
 
-  // Prefer voicings that ring out across the whole instrument, but price each
-  // silent string by how hard it actually is to silence (see above).
-  score += lowSideMutes * 0.4 + highSideMutes * 2.2;
-  if (lowSideMutes + highSideMutes + innerMutes === 0) {
+  /*
+   * Prefer voicings that ring out across the whole instrument, but price each
+   * silent string by how hard it actually is to silence (see above). Dropping
+   * one or two bass strings is free enough to be worth doing for a better bass
+   * note; past that you are throwing away the instrument, so the third one
+   * costs what a skipped string costs.
+   */
+  score += lowSideMutes * 0.4 + Math.max(0, lowSideMutes - 2) * 2.6 + skippedMutes * 3;
+  if (lowSideMutes + skippedMutes === 0) {
     score -= 1.2;
   }
 
@@ -314,28 +327,19 @@ function evaluate(
       score += pastBarre * 2.5;
       flags.push({ kind: "warn", text: "Must mute past the barre" });
     }
-
-    /*
-     * The same overhang makes a barre that stops short of the treble side
-     * outright unplayable when the strings past it have to ring open, or be
-     * fretted below the barre: the finger is already lying on them. Fmaj7 as
-     * 1-3-2-2-1-0 reads fine on paper — index barre at the 1st fret, high E
-     * open — but the barre is pressing that high E at the 1st fret whether
-     * you like it or not. Priced high enough that any honest alternative wins.
-     */
-    let deadened = 0;
-    for (let i = hand.barre.to + 1; i < frets.length; i++) {
-      const f = frets[i];
-      if (f !== null && f < hand.barre.fret) deadened++;
-    }
-    if (deadened > 0) {
-      score += deadened * 8;
-      flags.push({ kind: "warn", text: "Barre lies over the open high strings" });
-    }
   }
-  if (innerMutes > 0) {
-    score += 3 * innerMutes;
-    flags.push({ kind: "warn", text: `Skips ${innerMutes} inner string${innerMutes > 1 ? "s" : ""}` });
+  /*
+   * There is no penalty here for a barre lying over the strings past it, the
+   * way there used to be. computeHand no longer hands out a flat finger that
+   * would land on a string that has to ring — it spends the extra fingers, or
+   * gives up — so a shape that reaches this point has a barre it can actually
+   * hold.
+   */
+  if (skippedMutes > 0) {
+    flags.push({
+      kind: "warn",
+      text: `Skips ${skippedMutes} string${skippedMutes > 1 ? "s" : ""}`,
+    });
   }
 
   // Bass note quality.
@@ -350,11 +354,27 @@ function evaluate(
       flags.push({ kind: "warn", text: `${spec.bassName} is not the lowest note` });
     }
   } else {
+    /*
+     * Nobody typing "C" wants an inversion; they want a C, and the shape that
+     * happens to have the 3rd on the bottom is a different chord in a
+     * progression. Charged enough that dropping the bottom string to get the
+     * root underneath — the 0.4 a low-side mute costs — is always the better
+     * deal: x-2-2-4-2-4 rather than 0-2-2-4-2-4 when the A string carries the
+     * root.
+     */
     if (bassTone.role === "root") score -= 2.5;
-    else if (bassTone.role === "fifth") score += 0.5;
-    else if (bassTone.role === "third") score += 1.2;
-    else score += 2.5;
+    else if (bassTone.role === "fifth") score += 1.6;
+    else if (bassTone.role === "third") score += 2.6;
+    else score += 3.6;
   }
+  /*
+   * And of two shapes with the same note in the bass, the lower one wins by a
+   * little: a bass an octave down is worth a small amount of extra effort.
+   * Measured from the open lowest string so it means the same thing in every
+   * tuning, and kept under a point per octave so it can't outrank a genuinely
+   * easier grip.
+   */
+  score += (notes[0].midi - strings[0].midi) * 0.06;
   if (bassTone.role !== "root" && spec.bassChroma === null) {
     flags.push({ kind: "info", text: `${bassTone.label} in the bass` });
   }
@@ -406,7 +426,8 @@ function evaluate(
 }
 
 /**
- * How awkward the hand shape is, beyond simply counting fingers.
+ * How awkward the hand shape is, beyond simply counting fingers, given the
+ * finger placements computeHand settled on.
  *
  * Number the fingers 1-4 by fret, then by string within a fret. What makes a
  * shape fight back is not reach but *straddling*: fingers on a higher fret
@@ -422,42 +443,33 @@ function evaluate(
  * Cost is innerFingers x fretGap, which puts x31013 at four times open G.
  *
  * A *lower* fret group straddling a higher one is usually just a barre with
- * fingers inside it (every A-shape), so it is free — but only when it really
- * can be barred. In x-3-5-0-4-3 the open G string breaks the fret-3 barre, so
- * those are two independent fingers four strings apart with fingers at frets 5
- * and 4 trapped between them: the same claw, and it is charged the same.
+ * fingers inside it (every A-shape), so it is free — but only when one finger
+ * really is lying across it. In x-3-5-0-4-3 the open G string breaks the fret-3
+ * barre, so those are two independent fingers four strings apart with fingers
+ * at frets 5 and 4 trapped between them: the same claw, and it is charged the
+ * same.
  *
  * Interior open strings cost nothing in themselves — nothing has to be fretted
  * there, and open C rings one happily.
  */
-function handAwkwardness(
-  frets: (number | null)[],
-  fretted: VoicingNote[],
-): { straddle: number; arched: number } {
-  if (fretted.length < 2) return { straddle: 0, arched: 0 };
+function handAwkwardness(placements: Placement[]): number {
+  if (placements.length < 2) return 0;
 
   const byFret = new Map<number, number[]>();
-  for (const n of fretted) {
-    const list = byFret.get(n.fret) ?? [];
-    list.push(n.stringIndex);
-    byFret.set(n.fret, list);
+  for (const p of placements) {
+    const list = byFret.get(p.fret) ?? [];
+    for (let s = p.from; s <= p.to; s++) list.push(s);
+    byFret.set(p.fret, list);
   }
 
+  /** Is this whole group one finger lying flat across it? */
+  const oneFinger = (fret: number, from: number, to: number) =>
+    placements.some((p) => p.flat && p.fret === fret && p.from <= from && p.to >= to);
+
   const ordered = [...byFret.keys()].sort((a, b) => a - b);
-  let straddle = 0;
-
-  /** One finger can lie across this group only if everything inside is fretted at least as high. */
-  const barrable = (fret: number, from: number, to: number) => {
-    for (let s = from + 1; s < to; s++) {
-      const f = frets[s];
-      if (f === null || f < fret) return false;
-    }
-    return true;
-  };
-
   const topFret = ordered[ordered.length - 1];
   const bottomFret = ordered[0];
-  let arched = 0;
+  let straddle = 0;
 
   for (let a = 0; a < ordered.length; a++) {
     const fretA = ordered[a];
@@ -473,72 +485,115 @@ function handAwkwardness(
       const trapped = (byFret.get(fretB) as number[]).filter((s) => s > from && s < to).length;
       if (trapped === 0) continue;
       // Straddling from below is free when it is genuinely a barre.
-      if (fretA < fretB && barrable(fretA, from, to)) continue;
+      if (fretA < fretB && oneFinger(fretA, from, to)) continue;
       /*
        * And nothing is trapped when what sits between is the barre itself.
        * D7 as x-5-7-5-7-5 reads as the fret-7 pair straddling a fret-5 finger
        * on the G string, but that G string is under the index barre — the two
        * fingers at 7 have a flat bar beneath them, not a finger to reach
        * around. This is the ordinary A7 shape and must cost nothing.
+       *
+       * The bar has to run the whole width of the group standing on it, which
+       * is what makes it a floor to stand on. It used to be enough that the
+       * lower fret was *a* bar anywhere, and that quietly exempted the shape
+       * this rule exists to catch: in 4-4-2-2-4-4 the bar at the 2nd fret
+       * covers only the two middle strings, and the fingers at the 4th are
+       * outside it on both sides with nothing underneath them at all.
        */
-      if (fretA > fretB && fretB === bottomFret) {
-        const stringsB = byFret.get(fretB) as number[];
-        if (barrable(fretB, Math.min(...stringsB), Math.max(...stringsB))) continue;
-      }
-      straddle += trapped * Math.abs(fretB - fretA) * 0.55;
+      if (fretA > fretB && fretB === bottomFret && oneFinger(fretB, from, to)) continue;
+      /*
+       * Squared in the fret gap, because reaching around a bar is not linear in
+       * how far you reach. x-3-2-2-3-3 bars the D and G at the 2nd fret and puts
+       * fingers a single fret past it on both sides — an ordinary shape, and
+       * 15% of the curated bars have fingers reaching round them like that. At
+       * two frets the hand has to fan both ways at once and hold the spread:
+       * 4-4-2-2-4-4 wants the 4th fret on both bass strings and both treble
+       * strings around a bar at the 2nd, which is the shape nobody can hold.
+       */
+      const gap = Math.abs(fretB - fretA);
+      straddle += trapped * gap * gap * 0.55;
     }
 
     /*
-     * A split that cannot be barred means two fingers pinned to one fret with a
-     * gap between them. That is free when the split is the *highest* fret —
-     * every other finger is behind it and the hand reaches around, which is all
-     * open G (320003) asks for. It costs when other fingers sit further up the
-     * neck, because now the hand has to hold the spread and reach forward at
-     * the same time: x-3-1-0-1-x pins fret 1 across the D and B strings while
-     * the ring finger reaches to fret 3.
+     * A split group means separate fingers pinned to one fret with a gap
+     * between them. That is free when the split is the *highest* fret — every
+     * other finger is behind it and the hand reaches around, which is all open
+     * G (320003) asks for. It costs when other fingers sit further up the neck,
+     * because now the hand has to hold the spread and reach forward at the same
+     * time: x-3-1-0-1-x pins fret 1 across the D and B strings while the ring
+     * finger reaches to fret 3.
      */
-    if (!barrable(fretA, from, to)) {
-      if (fretA !== topFret) straddle += 0.5 + 0.3 * (to - from - 1);
-
-      /*
-       * An open string inside a same-fret split is only a problem when the
-       * finger beside it is lying *flat*. Two fingertips either side of a
-       * ringing string is routine — A7 as x-0-2-0-2-0, Cadd9 as x-3-2-0-3-0,
-       * and 7.4% of the curated library — because a fingertip stands on its
-       * own string and nothing overhangs. A finger covering two or more
-       * strings at once cannot do that: it is already lying across the neck,
-       * so the string next to it is under the flat of the finger, not beside
-       * it. Am7 as 5-0-5-5-5-5 asks for exactly that — a finger flat across
-       * D-G-B-e at fret 5, a second finger on the low E at the same fret, and
-       * the open A threaded between them.
-       *
-       * That combination appears 0 times in 2,069 curated fingerings, which is
-       * why it is priced to lose to any honest alternative. The old topFret
-       * exemption let it through free: a one-fret shape is trivially its own
-       * top fret.
-       */
-      const runs: number[][] = [];
-      for (const s of [...stringsA].sort((x, y) => x - y)) {
-        const last = runs[runs.length - 1];
-        if (last && s === last[last.length - 1] + 1) last.push(s);
-        else runs.push([s]);
-      }
-      for (let r = 1; r < runs.length; r++) {
-        const left = runs[r - 1];
-        const right = runs[r];
-        if (left.length < 2 && right.length < 2) continue;
-        for (let s = left[left.length - 1] + 1; s < right[0]; s++) {
-          if (frets[s] === 0) arched++;
-        }
-      }
+    if (!oneFinger(fretA, from, to) && fretA !== topFret) {
+      straddle += 0.5 + 0.3 * (to - from - 1);
     }
   }
 
-  return { straddle, arched };
+  return straddle;
+}
+
+/** One finger, on one fret, covering the strings `from`..`to`. */
+export interface Placement {
+  fret: number;
+  from: number;
+  to: number;
+  /** True when the finger lies flat across more than one string. */
+  flat: boolean;
 }
 
 /**
- * Work out how many fingers a shape needs.
+ * Whether one finger can lie flat at `fret` across the strings `from`..`to`.
+ *
+ * A finger lying flat is a bar across the neck, and a bar is much longer than
+ * the strings it means to press. Three things stop it.
+ *
+ * *Inside* the span, every string has to be pressed at this fret or higher — a
+ * flat finger sounds whatever is under it, so an open string or one fretted
+ * lower underneath simply isn't there any more.
+ *
+ * *Past* the span the finger keeps going, and whatever it touches it presses.
+ * The tip can be hyperextended to lift clear of the string immediately beyond,
+ * which is what makes every A-shape barre playable — x-2-4-4-4-2 has the ring
+ * finger flat over D-G-B while the high E rings under the index. What decides
+ * whether the tip can do that is not the fret gap but how much finger the bar
+ * has already spent. Among the 554 flat fingers in the curated library, bars
+ * that overhang a lower-fretted string are 52 two-string bars and 6
+ * three-string bars — and not one four-string bar, because by then the finger
+ * is at full stretch and the tip has no slack left to lift with. That is the
+ * whole difference between x-2-4-4-4-2, which everyone plays, and x-3-3-3-3-2,
+ * which is four fingers on the 3s and a fifth on the high E.
+ *
+ * It clears one string, not a run of them, and no amount of hyperextension
+ * clears an *open* string next door: the finger is lying exactly where that
+ * string has to ring.
+ *
+ * Nothing is checked *behind* the span, on the bass side. The shaft crosses
+ * those strings on its way in, but it crosses above them, and fingers pressing
+ * them at a higher fret come down past the bar rather than over it: x-3-3-3-1-1
+ * is a bar on the top two strings at the 1st fret with a finger per string
+ * behind it at the 3rd, and 18% of the flat fingers in the curated library
+ * reach back like that. It looks like a claw written down and isn't one under
+ * the hand.
+ */
+const WIDEST_OVERHANGING_BAR = 3;
+
+function canLieFlat(frets: (number | null)[], fret: number, from: number, to: number): boolean {
+  for (let s = from + 1; s < to; s++) {
+    const f = frets[s];
+    if (f === null || f < fret) return false;
+  }
+
+  // Only the next string along: that is as far as the finger reaches. A bar
+  // over the A and D strings has ended by the time you get to the B string,
+  // which is why the E-shape minor barre works — 8-10-10-8-8-8 clears the G
+  // string with the tip of the ring finger and never comes near the two above.
+  const beyond = frets[to + 1];
+  if (beyond === undefined || beyond === null || beyond >= fret) return true;
+  if (beyond === 0) return false;
+  return to - from + 1 <= WIDEST_OVERHANGING_BAR;
+}
+
+/**
+ * Work out how many fingers a shape needs, and which finger covers what.
  *
  * Calibrated against the 2,069 curated fingerings in @tombatossals/chords-db,
  * which shows one finger covering as many as five strings. The earlier model
@@ -546,16 +601,33 @@ function handAwkwardness(
  * demoted every A-shape barre: it scored x24442 at four fingers when most
  * players cover the 4-4-4 with a single ring-finger barre and use two.
  *
- * The model now is: group fretted notes by fret, and let one finger take each
+ * The model is: group fretted notes by fret, and let one finger take each
  * contiguous run of strings at the same fret. The lowest fret additionally gets
  * the full index barre, which may reach across strings fretted higher up.
+ *
+ * Laying a finger flat is an *option*, not an obligation, and that is the whole
+ * difference between a shape that works and one that doesn't. The open A chord
+ * x-0-2-2-2-0 is three strings at one fret, but nobody bars them, because the
+ * bar would land on the high E that has to ring open — so it costs three
+ * fingers rather than one, and that is the honest price. The model used to
+ * grant the flat finger anyway and then charge the shape for the damage, which
+ * put a four-point "must clear a ringing open string" penalty on open A, open
+ * Em and half the first chords anyone learns. Where the fallback runs past four
+ * fingers the shape really is unplayable — Fmaj7 as 1-3-2-2-1-0 needs five —
+ * and it drops out here rather than surviving as an expensive suggestion.
  */
 export function computeHand(
   frets: (number | null)[],
   fretted: VoicingNote[],
-): { fingers: number; barre: { fret: number; from: number; to: number } | null; span: number; lowestFret: number } | null {
+): {
+  fingers: number;
+  barre: { fret: number; from: number; to: number } | null;
+  span: number;
+  lowestFret: number;
+  placements: Placement[];
+} | null {
   if (!fretted.length) {
-    return { fingers: 0, barre: null, span: 0, lowestFret: 0 };
+    return { fingers: 0, barre: null, span: 0, lowestFret: 0, placements: [] };
   }
   const fretNumbers = fretted.map((n) => n.fret);
   const lowestFret = Math.min(...fretNumbers);
@@ -569,7 +641,7 @@ export function computeHand(
     byFret.set(n.fret, list);
   }
 
-  let fingers = 0;
+  const placements: Placement[] = [];
   let barre: { fret: number; from: number; to: number } | null = null;
 
   for (const fret of [...byFret.keys()].sort((a, b) => a - b)) {
@@ -578,35 +650,36 @@ export function computeHand(
     if (fret === lowestFret && strings.length >= 2) {
       const from = strings[0];
       const to = strings[strings.length - 1];
-      // The index finger lies flat across the span, so every string inside it
-      // is pressed at this fret. That rules out an open string underneath
-      // (impossible), a string fretted lower (impossible), and — the case the
-      // old model wrongly allowed — a *muted* string inside the span, which
-      // the barre would sound whether you wanted it or not.
-      let usable = true;
-      for (let i = from; i <= to; i++) {
-        const f = frets[i];
-        if (f === null || f < fret) {
-          usable = false;
-          break;
-        }
-      }
-      if (usable) {
+      // The index barre reaches across strings fretted higher up, which the
+      // per-run pass below cannot do. A muted string inside the span rules it
+      // out: the barre would sound it whether you wanted it or not.
+      if (canLieFlat(frets, fret, from, to)) {
         barre = { fret, from, to };
-        fingers += 1;
+        placements.push({ fret, from, to, flat: true });
         continue;
       }
     }
 
-    // Otherwise one finger per contiguous run of same-fret strings: this is the
-    // ring-finger partial barre that makes A-shapes practical.
-    let runs = 1;
-    for (let i = 1; i < strings.length; i++) {
-      if (strings[i] !== strings[i - 1] + 1) runs++;
+    // Otherwise one finger per contiguous run of same-fret strings — this is
+    // the ring-finger partial barre that makes A-shapes practical — falling
+    // back to a finger per string where that finger can't lie flat.
+    const runs: number[][] = [];
+    for (const s of strings) {
+      const last = runs[runs.length - 1];
+      if (last && s === last[last.length - 1] + 1) last.push(s);
+      else runs.push([s]);
     }
-    fingers += runs;
+    for (const run of runs) {
+      const from = run[0];
+      const to = run[run.length - 1];
+      if (from !== to && canLieFlat(frets, fret, from, to)) {
+        placements.push({ fret, from, to, flat: true });
+      } else {
+        for (const s of run) placements.push({ fret, from: s, to: s, flat: false });
+      }
+    }
   }
 
-  if (fingers > 4) return null;
-  return { fingers, barre, span, lowestFret };
+  if (placements.length > 4) return null;
+  return { fingers: placements.length, barre, span, lowestFret, placements };
 }

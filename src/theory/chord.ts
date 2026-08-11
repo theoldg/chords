@@ -487,21 +487,28 @@ export interface ProgressionEntry {
   text: string;
   spec: ChordSpec | null;
   error: string | null;
+  /** Where the symbol sits in the input, so the field can mark it in place. */
+  start: number;
+  end: number;
 }
 
 /**
  * Split a typed progression into chords. Accepts whitespace, commas, newlines
  * and bar lines as separators, so pasting "Am7 | D7 | Gmaj7" works as-is.
+ *
+ * Matched rather than split, because the caller needs to know *where* each
+ * symbol was: the input underlines the ones it could not read, and it can only
+ * do that against offsets into the original text.
  */
 export function parseProgression(input: string): ProgressionEntry[] {
-  return input
-    .split(/[\s,|\n\r]+/)
-    .map((t) => t.trim())
-    .filter((t) => t.length > 0 && t !== "-")
-    .map((text) => {
-      const { spec, error } = parseChordSymbol(text);
-      return { text, spec, error };
-    });
+  const entries: ProgressionEntry[] = [];
+  for (const m of input.matchAll(/[^\s,|]+/g)) {
+    const text = m[0];
+    if (text === "-") continue;
+    const { spec, error } = parseChordSymbol(text);
+    entries.push({ text, spec, error, start: m.index, end: m.index + text.length });
+  }
+  return entries;
 }
 
 export const ROOT_CHOICES = [

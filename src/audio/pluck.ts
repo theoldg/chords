@@ -23,10 +23,11 @@ function pluck(ac: AudioContext, midi: number, at: number, gain: number) {
   const ring = new Float32Array(delay);
   for (let i = 0; i < delay; i++) ring[i] = Math.random() * 2 - 1;
 
-  // Slight low-pass on the excitation keeps it from sounding like a snare.
+  // Slight low-pass on the excitation keeps it from sounding like a snare;
+  // leaning it further down takes the edge off the attack.
   let prev = 0;
   for (let i = 0; i < delay; i++) {
-    prev = 0.5 * ring[i] + 0.5 * prev;
+    prev = 0.35 * ring[i] + 0.65 * prev;
     ring[i] = prev;
   }
 
@@ -48,7 +49,7 @@ function pluck(ac: AudioContext, midi: number, at: number, gain: number) {
   g.gain.value = gain;
   const body = ac.createBiquadFilter();
   body.type = "lowpass";
-  body.frequency.value = 3400;
+  body.frequency.value = 2400;
   src.connect(body).connect(g).connect(ac.destination);
   src.start(at);
 }
@@ -57,6 +58,6 @@ function pluck(ac: AudioContext, midi: number, at: number, gain: number) {
 export function strum(midis: number[], opts: { spread?: number } = {}) {
   const ac = audioContext();
   const now = ac.currentTime + 0.02;
-  const spread = opts.spread ?? 0.028;
-  midis.forEach((m, i) => pluck(ac, m, now + i * spread, 0.32));
+  const spread = opts.spread ?? 0.038;
+  midis.forEach((m, i) => pluck(ac, m, now + i * spread, 0.36));
 }
