@@ -5,13 +5,11 @@ import {
   type ChordBuilderState,
   type ChordSpec,
 } from "../theory/chord";
-import { OMISSION_LABELS } from "../theory/rules";
 import { DEFAULT_SEARCH_OPTIONS, findVoicings, type SearchOptions } from "../theory/search";
 import { TUNING_PRESETS, parseTuning } from "../theory/tuning";
-import { strum } from "../audio/pluck";
 import { ChordBuilder } from "./ChordBuilder";
-import { ChordDiagram } from "./ChordDiagram";
 import { ProgressionView } from "./ProgressionView";
+import { VoicingCard } from "./VoicingCard";
 
 /** The two ways of naming what you want: type it (one or several), or build it. */
 type Mode = "progression" | "blocks";
@@ -262,54 +260,17 @@ export function App() {
             {result.emptyHint && <p className="empty">{result.emptyHint}</p>}
 
             <div className="grid">
-              {result.voicings.map((v) => (
-                <article className="card" key={v.id}>
-                  <div className="card-top">
-                    <span className="mono frets">
-                      {v.frets.map((f) => (f === null ? "x" : f)).join(" ")}
-                    </span>
-                    <button
-                      type="button"
-                      className="play"
-                      onClick={() => strum(v.notes.map((n) => n.midi))}
-                      aria-label="Play chord"
-                    >
-                      ▶
-                    </button>
-                  </div>
-
-                  {tuning && <ChordDiagram voicing={v} tuning={tuning} showDegrees={showDegrees} />}
-
-                  <div className="badges">
-                    {v.omitted.map((o) => {
-                      const rule = result.rules.find((r) => r.tone.degree === o.tone.degree);
-                      return (
-                        <span
-                          className="badge omit"
-                          key={o.tone.degree}
-                          title={rule?.explanation ?? ""}
-                        >
-                          omits the {o.label}
-                          {rule?.reason && <em> · {OMISSION_LABELS[rule.reason]}</em>}
-                        </span>
-                      );
-                    })}
-                    {v.flags.map((f) => (
-                      <span className={`badge ${f.kind}`} key={f.text}>
-                        {f.text}
-                      </span>
-                    ))}
-                  </div>
-
-                  <div className="card-foot">
-                    <span>{v.fingers === 0 ? "open" : `${v.fingers} finger${v.fingers > 1 ? "s" : ""}`}</span>
-                    <span>·</span>
-                    <span>{v.notes.length} strings</span>
-                    <span>·</span>
-                    <span>top {v.topTone?.label}</span>
-                  </div>
-                </article>
-              ))}
+              {tuning &&
+                result.voicings.map((v) => (
+                  <VoicingCard
+                    key={v.id}
+                    voicing={v}
+                    tuning={tuning}
+                    rules={result.rules}
+                    showDegrees={showDegrees}
+                    playLabel={`Play ${spec.symbol}`}
+                  />
+                ))}
             </div>
           </section>
         </>

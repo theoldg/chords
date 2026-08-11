@@ -35,6 +35,15 @@ export function ChordDiagram({ voicing, tuning, showDegrees }: Props) {
   const position = fretted.length ? Math.min(...fretted) : 0;
   const showPosition = position >= 3;
 
+  /*
+   * Whether the lowest sounding string is carrying something other than the
+   * root. That changes what the chord is called and what it does under a
+   * progression, and the diagram is where you notice it — the engine's "3rd in
+   * the bass" flag is text, and the progression view shows warnings only.
+   */
+  const inverted = voicing.bassTone !== null && voicing.bassTone.role !== "root";
+  const bassString = voicing.notes[0]?.stringIndex;
+
   const openTone = (stringIndex: number) =>
     voicing.notes.find((n) => n.stringIndex === stringIndex && n.fret === 0)?.tone;
 
@@ -147,17 +156,27 @@ export function ChordDiagram({ voicing, tuning, showDegrees }: Props) {
             </text>
           ))}
 
-      {/* Note names along the bottom */}
+      {/* Note names along the bottom, with the bass highlighted when the shape
+          is not sitting on its root, so the string carrying it is findable at
+          a glance. The card's "over b3" tag names the degree. */}
       {tuning.strings.map((_, i) => {
         const note = voicing.notes.find((n) => n.stringIndex === i);
+        const isBass = inverted && i === bassString;
         return (
           <text
             key={`n${i}`}
             x={x(i)}
             y={top + FRETS_SHOWN * fretGap + 18}
-            className={note ? "note-name" : "note-name muted"}
+            className={
+              note
+                ? isBass
+                  ? `note-name bass role-${note.tone.role}`
+                  : "note-name"
+                : "note-name muted"
+            }
             textAnchor="middle"
           >
+            {isBass && <title>{`${voicing.bassTone?.label} in the bass`}</title>}
             {note ? note.tone.noteName : "×"}
           </text>
         );

@@ -437,13 +437,19 @@ code {
   color: var(--ink-faint);
 }
 
-.role-root { color: var(--role-root); }
-.role-third { color: var(--role-third); }
-.role-fifth { color: var(--role-fifth); }
-.role-seventh { color: var(--role-seventh); }
-.role-sixth { color: var(--role-sixth); }
-.role-extension { color: var(--role-extension); }
-.role-suspension { color: var(--role-suspension); }
+/*
+ * Each role publishes its colour as --role-colour as well as setting `color`,
+ * so a rule that has to name the colour itself — a badge whose own class sets
+ * `color` later in this file, an SVG that needs `fill` — can reach it without
+ * repeating the seven-way switch.
+ */
+.role-root { --role-colour: var(--role-root); color: var(--role-colour); }
+.role-third { --role-colour: var(--role-third); color: var(--role-colour); }
+.role-fifth { --role-colour: var(--role-fifth); color: var(--role-colour); }
+.role-seventh { --role-colour: var(--role-seventh); color: var(--role-colour); }
+.role-sixth { --role-colour: var(--role-sixth); color: var(--role-colour); }
+.role-extension { --role-colour: var(--role-extension); color: var(--role-colour); }
+.role-suspension { --role-colour: var(--role-suspension); color: var(--role-colour); }
 
 /* --- options --- */
 
@@ -620,6 +626,12 @@ code {
   font-size: 10.5px;
   font-family: ui-monospace, Menlo, monospace;
 }
+/* The bass string when it is not the root, in the colour of the degree it is
+   sounding — the same colour as its dot and its "over b3" badge. */
+.note-name.bass {
+  fill: var(--role-colour);
+  font-weight: 700;
+}
 .note-name.muted {
   fill: var(--ink-faint);
   opacity: 0.5;
@@ -640,10 +652,6 @@ code {
   color: var(--ink-soft);
   cursor: default;
 }
-.badge em {
-  font-style: normal;
-  opacity: 0.68;
-}
 .badge.omit {
   background: var(--warn-soft);
   color: var(--warn);
@@ -655,14 +663,13 @@ code {
   color: var(--accent);
   border-color: transparent;
 }
-
-.card-foot {
-  display: flex;
-  gap: 6px;
-  font-size: 11.5px;
-  color: var(--ink-faint);
-  margin-top: auto;
-  padding-top: 4px;
+/* Wears the colour of the degree it names, matching that note under the
+   diagram and the dot that sounds it. */
+.badge.bass {
+  color: var(--role-colour);
+  border-color: currentColor;
+  opacity: 0.95;
+  font-weight: 550;
 }
 
 /* --- progression rows --- */

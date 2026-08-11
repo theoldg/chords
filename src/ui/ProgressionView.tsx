@@ -1,10 +1,8 @@
 import { useMemo } from "react";
 import { parseProgression } from "../theory/chord";
-import { OMISSION_LABELS } from "../theory/rules";
 import { findVoicings, type SearchOptions } from "../theory/search";
 import type { Tuning } from "../theory/tuning";
-import { strum } from "../audio/pluck";
-import { ChordDiagram } from "./ChordDiagram";
+import { VoicingCard } from "./VoicingCard";
 
 interface Props {
   text: string;
@@ -55,48 +53,19 @@ export function ProgressionView({ text, tuning, opts, showDegrees }: Props) {
 
           {result && result.voicings.length > 0 && (
             <div className="strip" role="list">
-              {result.voicings.map((v) => (
-                <article className="card strip-card" key={v.id} role="listitem">
-                  <div className="card-top">
-                    <span className="mono frets">
-                      {v.frets.map((f) => (f === null ? "x" : f)).join(" ")}
-                    </span>
-                    <button
-                      type="button"
-                      className="play"
-                      onClick={() => strum(v.notes.map((n) => n.midi))}
-                      aria-label={`Play ${entry.spec?.symbol ?? entry.text}`}
-                    >
-                      ▶
-                    </button>
-                  </div>
-
-                  {tuning && <ChordDiagram voicing={v} tuning={tuning} showDegrees={showDegrees} />}
-
-                  <div className="badges">
-                    {v.omitted.map((o) => {
-                      const rule = result.rules.find((r) => r.tone.degree === o.tone.degree);
-                      return (
-                        <span
-                          className="badge omit"
-                          key={o.tone.degree}
-                          title={rule?.explanation ?? ""}
-                        >
-                          omits {o.label}
-                          {rule?.reason && <em> · {OMISSION_LABELS[rule.reason]}</em>}
-                        </span>
-                      );
-                    })}
-                    {v.flags
-                      .filter((f) => f.kind === "warn")
-                      .map((f) => (
-                        <span className={`badge ${f.kind}`} key={f.text}>
-                          {f.text}
-                        </span>
-                      ))}
-                  </div>
-                </article>
-              ))}
+              {tuning &&
+                result.voicings.map((v) => (
+                  <VoicingCard
+                    key={v.id}
+                    voicing={v}
+                    tuning={tuning}
+                    rules={result.rules}
+                    showDegrees={showDegrees}
+                    playLabel={`Play ${entry.spec?.symbol ?? entry.text}`}
+                    className="strip-card"
+                    role="listitem"
+                  />
+                ))}
             </div>
           )}
         </section>
