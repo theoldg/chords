@@ -198,13 +198,20 @@ function evaluate(
   score += hand.fingers * 1.2;
   if (hand.barre) score += 1.4;
   score += Math.max(0, hand.span - 1) * 1.5;
+
   score -= notes.filter((n) => n.fret === 0).length * 0.6;
+
+  const awkward = handAwkwardness(fretted);
+  score += awkward.straddle;
+  if (awkward.straddle >= 1.5) {
+    flags.push({ kind: "warn", text: "Fingers have to straddle" });
+  }
 
   // Prefer shapes near the nut. Cheap to reach, easier to hold, and they get
   // to use open strings. Scaled so a shape twelve frets up pays about four
   // points — enough to lose to its open-position equivalent, not so much that
   // it outweighs dropping a required-ish tone.
-  score += hand.lowestFret * 0.35;
+  score += hand.lowestFret * 0.55;
 
   // Prefer voicings that ring out across the whole instrument, but price each
   // silent string by how hard it actually is to silence (see above).
@@ -269,23 +276,12 @@ function evaluate(
     }
   }
   if (muddy) {
-    score += muddy * 2.5;
+    score += muddy * 0.8;
     flags.push({ kind: "warn", text: "Muddy in the low end" });
   }
   if (harsh) {
     score += harsh * 3;
     flags.push({ kind: "warn", text: "Harsh b9 clash between voices" });
-  }
-
-  // Doubling an extension or a 7th is usually worse than doubling root/5th.
-  const degreeCounts = new Map<number, number>();
-  for (const n of notes) degreeCounts.set(n.tone.degree, (degreeCounts.get(n.tone.degree) ?? 0) + 1);
-  for (const [degree, count] of degreeCounts) {
-    if (count > 1) {
-      // Doubling the root or 5th is harmless; doubling colour tones muddies the
-      // chord. The small base cost breaks ties toward the simpler shape.
-      score += (count - 1) * (degree === 1 || degree === 5 ? 0.4 : 1.2);
-    }
   }
 
   if (hand.barre) flags.push({ kind: "info", text: `Barre at fret ${hand.barre.fret}` });
@@ -305,6 +301,57 @@ function evaluate(
     topTone,
     id: frets.map((f) => (f === null ? "x" : f)).join("-"),
   };
+}
+
+/**
+ * How awkward the hand shape is, beyond simply counting fingers.
+ *
+ * Number the fingers 1-4 by fret, then by string within a fret. What makes a
+ * shape fight back is not reach but *straddling*: fingers on a higher fret
+ * sitting on strings either side of fingers on a lower fret. The outer fingers
+ * have to press forward while the inner ones stay back, and the hand cannot
+ * fan that way.
+ *
+ *   x31013  fret 1 on D and B, fret 3 on A and high E. Fingers 3 and 4
+ *           straddle fingers 1 and 2: two inner fingers, two frets apart.
+ *   320003  fret 2 on A, fret 3 on low and high E. Also straddles, but with
+ *           one inner finger one fret apart — a standard open G.
+ *
+ * Cost is innerFingers x fretGap, which puts x31013 at four times open G.
+ *
+ * A *lower* fret group straddling a higher one is just a barre with fingers
+ * inside it (every A-shape), so it costs nothing — only the higher-over-lower
+ * direction is penalised. Interior open strings cost nothing either: nothing
+ * has to be fretted there.
+ */
+function handAwkwardness(fretted: VoicingNote[]): { straddle: number } {
+  if (fretted.length < 2) return { straddle: 0 };
+
+  const byFret = new Map<number, number[]>();
+  for (const n of fretted) {
+    const list = byFret.get(n.fret) ?? [];
+    list.push(n.stringIndex);
+    byFret.set(n.fret, list);
+  }
+
+  const ordered = [...byFret.keys()].sort((a, b) => a - b);
+  let straddle = 0;
+
+  for (let hi = 0; hi < ordered.length; hi++) {
+    const upperFret = ordered[hi];
+    const upperStrings = byFret.get(upperFret) as number[];
+    const from = Math.min(...upperStrings);
+    const to = Math.max(...upperStrings);
+    if (from === to) continue; // a single finger cannot straddle anything
+
+    for (let lo = 0; lo < hi; lo++) {
+      const lowerFret = ordered[lo];
+      const trapped = (byFret.get(lowerFret) as number[]).filter((s) => s > from && s < to).length;
+      if (trapped > 0) straddle += trapped * (upperFret - lowerFret) * 0.55;
+    }
+  }
+
+  return { straddle };
 }
 
 /**

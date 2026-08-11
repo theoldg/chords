@@ -113,6 +113,39 @@ describe("A-shape barres rank well", () => {
   });
 });
 
+describe("awkwardness, verified on a real guitar", () => {
+  const tuning = () => parseTuning("EADGBE").tuning!;
+  const shapes = (symbol: string) =>
+    findVoicings(parseChordSymbol(symbol).spec!, tuning(), {
+      ...DEFAULT_SEARCH_OPTIONS,
+      maxResults: 5000,
+    }).voicings;
+
+  it("ranks the Cm barre above x31013, which is nastier than it looks", () => {
+    // Reported from actually playing it: x31013 puts fret 1 on both sides of
+    // the open G and fret 3 four strings apart, so all four fingers are
+    // splayed at once. Much harder than the barre despite the finger count.
+    const all = shapes("Cm");
+    const barre = all.findIndex((v) => v.id === "x-3-5-5-4-3");
+    const nasty = all.findIndex((v) => v.id === "x-3-1-0-1-3");
+    expect(barre).toBeGreaterThanOrEqual(0);
+    expect(nasty).toBeGreaterThanOrEqual(0);
+    expect(barre).toBeLessThan(nasty);
+  });
+
+  it("leaves interior open strings unpenalised — open C is a first chord", () => {
+    // x32010 rings the open G between two fretted strings. Its fingers sit on a
+    // natural 3-2-1 diagonal and only have to arch, which costs nothing.
+    expect(shapes("C")[0].id).toBe("x-3-2-0-1-0");
+  });
+
+  it("still likes the standard open shapes best", () => {
+    expect(shapes("E")[0].id).toBe("0-2-2-1-0-0");
+    expect(shapes("Am")[0].id).toBe("x-0-2-2-1-0");
+    expect(shapes("D")[0].id).toBe("x-x-0-2-3-2");
+  });
+});
+
 describe("muting is priced by how hard it is", () => {
   const tuning = () => parseTuning("EADGBE").tuning!;
   const find = (symbol: string, id: string) =>

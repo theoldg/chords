@@ -96,7 +96,7 @@ describe("chord parsing", () => {
 
 describe("block builder", () => {
   it("builds Gm(add11) from blocks and matches the typed form", () => {
-    const built = buildChord(DEFAULT_BUILDER);
+    const built = buildChord({ ...DEFAULT_BUILDER, root: "G", triad: "min", ext11: "add" });
     expect(built.symbol).toBe("Gm(add11)");
     const typed = parseChordSymbol("Gm(add11)").spec!;
     expect(built.tones.map((t) => t.label)).toEqual(typed.tones.map((t) => t.label));
@@ -208,7 +208,10 @@ describe("voicing search", () => {
   });
 
   it("finds the Hendrix E7#9 and reports that it drops the 5th", () => {
-    const res = search("E7#9", "EADGBE", { minSoundingStrings: 4, maxResults: 200 });
+    // Ranked low on purpose — it lives at the 7th fret and we prefer low
+    // positions — so search the whole space. What matters here is that the
+    // engine finds it at all and reports the omission correctly.
+    const res = search("E7#9", "EADGBE", { minSoundingStrings: 4, maxResults: 100000 });
     const hendrix = res.voicings.find((v) => v.id === "x-7-6-7-8-x");
     expect(hendrix).toBeTruthy();
     expect(hendrix!.omitted.map((o) => o.label)).toEqual(["5"]);
