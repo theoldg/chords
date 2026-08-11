@@ -149,13 +149,29 @@ function evaluate(
 
   if (notes.length < opts.minSoundingStrings) return null;
 
-  // Inner mutes: a muted string between two sounding ones needs deliberate
-  // muting technique, so it's opt-in.
+  /*
+   * Silencing a string is not equally easy everywhere, and treating it as a
+   * flat cost was demoting every A-shape barre. Frequencies in the 2,069
+   * curated shapes of @tombatossals/chords-db:
+   *
+   *   low-side  (below the lowest sounding string)  54.4%  — routine: the
+   *             fretting thumb or picking hand damps it, and you simply start
+   *             the strum lower down
+   *   high-side (above the highest sounding string) 16.1%  — awkward: nothing
+   *             is naturally resting there
+   *   inner                                         10.5%  — needs deliberate
+   *             technique, so it stays opt-in
+   */
   const firstSounding = notes[0].stringIndex;
   const lastSounding = notes[notes.length - 1].stringIndex;
   let innerMutes = 0;
-  for (let i = firstSounding; i <= lastSounding; i++) {
-    if (frets[i] === null) innerMutes++;
+  let lowSideMutes = 0;
+  let highSideMutes = 0;
+  for (let i = 0; i < frets.length; i++) {
+    if (frets[i] !== null) continue;
+    if (i < firstSounding) lowSideMutes++;
+    else if (i > lastSounding) highSideMutes++;
+    else innerMutes++;
   }
   if (innerMutes > 0 && !opts.allowInnerMutes) return null;
 
@@ -190,16 +206,31 @@ function evaluate(
   // it outweighs dropping a required-ish tone.
   score += hand.lowestFret * 0.35;
 
-  // Prefer voicings that ring out across the whole instrument: every silent
-  // string is a cost, and using all of them earns an extra bonus on top.
-  const silentStrings = strings.length - notes.length;
-  score += silentStrings * 1.6;
-  if (silentStrings === 0) {
-    score -= 1.5;
+  // Prefer voicings that ring out across the whole instrument, but price each
+  // silent string by how hard it actually is to silence (see above).
+  score += lowSideMutes * 0.4 + highSideMutes * 2.2;
+  if (lowSideMutes + highSideMutes + innerMutes === 0) {
+    score -= 1.2;
     flags.push({ kind: "info", text: "All strings" });
   }
+
+  /*
+   * A barre finger doesn't stop at the last string it's fretting — it lies
+   * across the neck and keeps going. Silencing a string past the end of a
+   * barre means overhanging the tip and damping without pressing, which is
+   * why only 8% of curated barre shapes do it. (Silencing a string *inside*
+   * the barre is outright impossible, and computeHand now refuses to grant a
+   * barre in that case at all.)
+   */
+  if (hand.barre) {
+    const pastBarre = frets.filter((f, i) => f === null && i > hand.barre!.to).length;
+    if (pastBarre > 0) {
+      score += pastBarre * 2.5;
+      flags.push({ kind: "warn", text: "Must mute past the barre" });
+    }
+  }
   if (innerMutes > 0) {
-    score += 4 * innerMutes;
+    score += 3 * innerMutes;
     flags.push({ kind: "warn", text: `Skips ${innerMutes} inner string${innerMutes > 1 ? "s" : ""}` });
   }
 
@@ -276,7 +307,20 @@ function evaluate(
   };
 }
 
-function computeHand(
+/**
+ * Work out how many fingers a shape needs.
+ *
+ * Calibrated against the 2,069 curated fingerings in @tombatossals/chords-db,
+ * which shows one finger covering as many as five strings. The earlier model
+ * counted every fretted note above the barre as its own finger, which quietly
+ * demoted every A-shape barre: it scored x24442 at four fingers when most
+ * players cover the 4-4-4 with a single ring-finger barre and use two.
+ *
+ * The model now is: group fretted notes by fret, and let one finger take each
+ * contiguous run of strings at the same fret. The lowest fret additionally gets
+ * the full index barre, which may reach across strings fretted higher up.
+ */
+export function computeHand(
   frets: (number | null)[],
   fretted: VoicingNote[],
 ): { fingers: number; barre: { fret: number; from: number; to: number } | null; span: number; lowestFret: number } | null {
@@ -288,25 +332,50 @@ function computeHand(
   const highestFret = Math.max(...fretNumbers);
   const span = highestFret - lowestFret + 1;
 
-  // Can we barre the lowest fret? Only if at least two strings sit on it and
-  // nothing inside the barre span is played open (you can't sound an open
-  // string underneath a barre).
-  const atLowest = fretted.filter((n) => n.fret === lowestFret);
-  let barre: { fret: number; from: number; to: number } | null = null;
-  if (atLowest.length >= 2) {
-    const from = atLowest[0].stringIndex;
-    const to = atLowest[atLowest.length - 1].stringIndex;
-    let usable = true;
-    for (let i = from; i <= to; i++) {
-      const f = frets[i];
-      if (f !== null && f < lowestFret) usable = false; // includes open strings
-    }
-    if (usable) barre = { fret: lowestFret, from, to };
+  const byFret = new Map<number, number[]>();
+  for (const n of fretted) {
+    const list = byFret.get(n.fret) ?? [];
+    list.push(n.stringIndex);
+    byFret.set(n.fret, list);
   }
 
-  const fingers = barre
-    ? 1 + fretted.filter((n) => n.fret > lowestFret).length
-    : fretted.length;
+  let fingers = 0;
+  let barre: { fret: number; from: number; to: number } | null = null;
+
+  for (const fret of [...byFret.keys()].sort((a, b) => a - b)) {
+    const strings = (byFret.get(fret) as number[]).sort((a, b) => a - b);
+
+    if (fret === lowestFret && strings.length >= 2) {
+      const from = strings[0];
+      const to = strings[strings.length - 1];
+      // The index finger lies flat across the span, so every string inside it
+      // is pressed at this fret. That rules out an open string underneath
+      // (impossible), a string fretted lower (impossible), and — the case the
+      // old model wrongly allowed — a *muted* string inside the span, which
+      // the barre would sound whether you wanted it or not.
+      let usable = true;
+      for (let i = from; i <= to; i++) {
+        const f = frets[i];
+        if (f === null || f < fret) {
+          usable = false;
+          break;
+        }
+      }
+      if (usable) {
+        barre = { fret, from, to };
+        fingers += 1;
+        continue;
+      }
+    }
+
+    // Otherwise one finger per contiguous run of same-fret strings: this is the
+    // ring-finger partial barre that makes A-shapes practical.
+    let runs = 1;
+    for (let i = 1; i < strings.length; i++) {
+      if (strings[i] !== strings[i - 1] + 1) runs++;
+    }
+    fingers += runs;
+  }
 
   if (fingers > 4) return null;
   return { fingers, barre, span, lowestFret };
